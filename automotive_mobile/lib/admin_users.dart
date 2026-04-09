@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AdminUsers extends StatefulWidget {
   const AdminUsers({super.key});
@@ -9,21 +11,9 @@ class AdminUsers extends StatefulWidget {
 
 class _AdminUsersState extends State<AdminUsers> {
   static const _red = Color(0xFFE8001C);
-
-  final List<Map<String, String>> _users = [
-    {'name': 'Administrator', 'username': 'admin', 'email': 'admin@caltex.com', 'role': 'Admin', 'status': 'Active'},
-    {'name': 'Staff Member', 'username': 'staff', 'email': 'staff@caltex.com', 'role': 'Staff', 'status': 'Active'},
-    {'name': 'John Doe', 'username': 'customer', 'email': 'john@email.com', 'role': 'Customer', 'status': 'Active'},
-  ];
-
-  List<Map<String, String>> _filtered = [];
   final _searchCtrl = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    _filtered = List.from(_users);
-  }
+  bool _searching = false;
+  String _searchQuery = '';
 
   @override
   void dispose() {
@@ -31,30 +21,17 @@ class _AdminUsersState extends State<AdminUsers> {
     super.dispose();
   }
 
-  void _onSearch(String q) {
-    setState(() {
-      _filtered = _users.where((u) =>
-        u['name']!.toLowerCase().contains(q.toLowerCase()) ||
-        u['username']!.toLowerCase().contains(q.toLowerCase()) ||
-        u['role']!.toLowerCase().contains(q.toLowerCase())
-      ).toList();
-    });
-  }
-
   Color _roleColor(String role) {
-    if (role == 'Admin') return _red;
-    if (role == 'Staff') return const Color(0xFF003087);
+    if (role == 'admin') return _red;
+    if (role == 'staff') return const Color(0xFF003087);
     return Colors.green;
   }
 
-  bool _searching = false;
+  String _roleLabel(String role) =>
+      role[0].toUpperCase() + role.substring(1);
 
   @override
   Widget build(BuildContext context) {
-    final total = _users.length;
-    final active = _users.where((u) => u['status'] == 'Active').length;
-    final inactive = _users.where((u) => u['status'] == 'Inactive').length;
-
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
       floatingActionButton: FloatingActionButton(
@@ -70,7 +47,7 @@ class _AdminUsersState extends State<AdminUsers> {
             ? TextField(
                 controller: _searchCtrl,
                 autofocus: true,
-                onChanged: _onSearch,
+                onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
                 style: const TextStyle(color: Colors.white),
                 decoration: const InputDecoration(
                   hintText: 'Search users...',
@@ -83,40 +60,71 @@ class _AdminUsersState extends State<AdminUsers> {
         actions: [
           IconButton(
             icon: Icon(_searching ? Icons.close : Icons.search, color: Colors.white),
-            onPressed: () {
-              setState(() {
-                _searching = !_searching;
-                if (!_searching) {
-                  _searchCtrl.clear();
-                  _filtered = List.from(_users);
-                }
-              });
-            },
+            onPressed: () => setState(() {
+              _searching = !_searching;
+              if (!_searching) { _searchCtrl.clear(); _searchQuery = ''; }
+            }),
           ),
         ],
       ),
-      body: Column(children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: Row(children: [
-            _statChip('Total', '$total', Colors.blue),
-            const SizedBox(width: 8),
-            _statChip('Active', '$active', Colors.green),
-            const SizedBox(width: 8),
-            _statChip('Inactive', '$inactive', const Color(0xFF718096)),
-          ]),
-        ),
-        Expanded(
-          child: _filtered.isEmpty
-            ? const Center(child: Text('No users found.', style: TextStyle(color: Color(0xFF718096))))
-            : ListView.separated(
-                padding: const EdgeInsets.all(16),
-                itemCount: _filtered.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (_, i) => _userCard(_filtered[i]),
-              ),
-        ),
-      ]),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance.collection('users').snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+
+          final docs = snapshot.data?.docs ?? [];
+          final users = docs.map((d) {
+            final data = d.data() as Map<String, dynamic>;
+            return {
+              'uid': d.id,
+              'name': data['name'] as String? ?? '—',
+              'username': data['username'] as String? ?? '—',
+              'email': data['email'] as String? ?? '—',
+              'role': data['role'] as String? ?? '—',
+              'status': data['status'] as String? ?? 'Active',
+            };
+          }).toList();
+
+          final filtered = _searchQuery.isEmpty
+              ? users
+              : users.where((u) =>
+                  u['name']!.toLowerCase().contains(_searchQuery) ||
+                  u['username']!.toLowerCase().contains(_searchQuery) ||
+                  u['role']!.toLowerCase().contains(_searchQuery)).toList();
+
+          final total = users.length;
+          final customers = users.where((u) => u['role'] == 'customer').length;
+          final staff = users.where((u) => u['role'] == 'staff').length;
+
+          return Column(children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: Row(children: [
+                _statChip('Total', '$total', Colors.blue),
+                const SizedBox(width: 8),
+                _statChip('Customer', '$customers', Colors.green),
+                const SizedBox(width: 8),
+                _statChip('Staff', '$staff', const Color(0xFF003087)),
+              ]),
+            ),
+            Expanded(
+              child: filtered.isEmpty
+                  ? const Center(child: Text('No users found.', style: TextStyle(color: Color(0xFF718096))))
+                  : ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: filtered.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      itemBuilder: (_, i) => _userCard(filtered[i]),
+                    ),
+            ),
+          ]);
+        },
+      ),
     );
   }
 
@@ -146,7 +154,8 @@ class _AdminUsersState extends State<AdminUsers> {
           CircleAvatar(
             radius: 22,
             backgroundColor: rc.withOpacity(0.15),
-            child: Text(u['name']![0], style: TextStyle(color: rc, fontWeight: FontWeight.bold, fontSize: 16)),
+            child: Text(u['name']![0].toUpperCase(),
+              style: TextStyle(color: rc, fontWeight: FontWeight.bold, fontSize: 16)),
           ),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -158,7 +167,7 @@ class _AdminUsersState extends State<AdminUsers> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(color: rc.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-              child: Text(u['role']!, style: TextStyle(fontSize: 10, color: rc, fontWeight: FontWeight.w600)),
+              child: Text(_roleLabel(u['role']!), style: TextStyle(fontSize: 10, color: rc, fontWeight: FontWeight.w600)),
             ),
             const SizedBox(height: 4),
             Text(u['status']!,
@@ -198,7 +207,8 @@ class _AdminUsersState extends State<AdminUsers> {
               decoration: BoxDecoration(color: rc, borderRadius: const BorderRadius.vertical(top: Radius.circular(24))),
               child: Row(children: [
                 CircleAvatar(radius: 26, backgroundColor: Colors.white24,
-                  child: Text(u['name']![0], style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold))),
+                  child: Text(u['name']![0].toUpperCase(),
+                    style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold))),
                 const SizedBox(width: 12),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(u['name']!, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
@@ -211,11 +221,11 @@ class _AdminUsersState extends State<AdminUsers> {
             Padding(
               padding: const EdgeInsets.all(20),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                _detailRow('Full Name', u['name'] ?? '—'),
+                _detailRow('Full Name', u['name']!),
                 _detailRow('Username', '@${u['username']}'),
-                _detailRow('Email', u['email'] ?? '—'),
-                _detailRow('Role', u['role'] ?? '—'),
-                _detailRow('Status', u['status'] ?? '—'),
+                _detailRow('Email', u['email']!),
+                _detailRow('Role', _roleLabel(u['role']!)),
+                _detailRow('Status', u['status']!),
                 const SizedBox(height: 16),
                 SizedBox(width: double.infinity,
                   child: OutlinedButton.icon(
@@ -247,13 +257,17 @@ class _AdminUsersState extends State<AdminUsers> {
     final usernameCtrl = TextEditingController(text: user?['username'] ?? '');
     final emailCtrl = TextEditingController(text: user?['email'] ?? '');
     final passCtrl = TextEditingController();
-    String selectedRole = user?['role'] ?? 'Staff';
+    String selectedRole = isEdit
+        ? (user!['role']![0].toUpperCase() + user['role']!.substring(1))
+        : 'Staff';
     String selectedStatus = user?['status'] ?? 'Active';
 
     showModalBottomSheet(
       context: context, isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => StatefulBuilder(
+      builder: (_) {
+        bool obscurePass = true;
+        return StatefulBuilder(
         builder: (ctx, setModal) => DraggableScrollableSheet(
           expand: false, initialChildSize: 0.9, maxChildSize: 0.97,
           builder: (_, ctrl) => SingleChildScrollView(
@@ -288,9 +302,15 @@ class _AdminUsersState extends State<AdminUsers> {
                     keyboardType: TextInputType.emailAddress,
                     decoration: const InputDecoration(labelText: 'Email *', border: OutlineInputBorder())),
                   const SizedBox(height: 10),
-                  Row(children: [
-                    Expanded(child: DropdownButtonFormField<String>(
+                  Theme(
+                    data: Theme.of(context).copyWith(
+                      inputDecorationTheme: const InputDecorationTheme(
+                        contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                      ),
+                    ),
+                    child: DropdownButtonFormField<String>(
                       value: selectedRole,
+                      isExpanded: true,
                       decoration: const InputDecoration(labelText: 'Role *', border: OutlineInputBorder()),
                       items: const [
                         DropdownMenuItem(value: 'Admin', child: Text('Admin')),
@@ -298,15 +318,20 @@ class _AdminUsersState extends State<AdminUsers> {
                         DropdownMenuItem(value: 'Customer', child: Text('Customer')),
                       ],
                       onChanged: (v) => setModal(() => selectedRole = v!),
-                    )),
-                  ]),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
                   const SizedBox(height: 10),
                   TextField(
                     controller: passCtrl,
-                    obscureText: true,
+                    obscureText: obscurePass,
                     decoration: InputDecoration(
                       labelText: isEdit ? 'New Password (leave blank to keep)' : 'Password *',
                       border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(
+                        icon: Icon(obscurePass ? Icons.visibility_off : Icons.visibility, size: 20),
+                        onPressed: () => setModal(() => obscurePass = !obscurePass),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -316,25 +341,48 @@ class _AdminUsersState extends State<AdminUsers> {
                       child: const Text('Cancel'))),
                     const SizedBox(width: 12),
                     Expanded(child: ElevatedButton(
-                      onPressed: () {
-                        if (nameCtrl.text.trim().isEmpty || usernameCtrl.text.trim().isEmpty) return;
-                        setState(() {
-                          final newUser = {
-                            'name': nameCtrl.text.trim(),
-                            'username': usernameCtrl.text.trim(),
-                            'email': emailCtrl.text.trim(),
-                            'role': selectedRole,
-                            'status': selectedStatus,
-                          };
+                      onPressed: () async {
+                        if (nameCtrl.text.trim().isEmpty ||
+                            usernameCtrl.text.trim().isEmpty ||
+                            emailCtrl.text.trim().isEmpty) return;
+                        if (!isEdit && passCtrl.text.trim().isEmpty) return;
+                        try {
                           if (isEdit) {
-                            final idx = _users.indexWhere((e) => e['username'] == user!['username']);
-                            if (idx != -1) _users[idx] = newUser;
+                            await FirebaseFirestore.instance
+                                .collection('users')
+                                .doc(user!['uid'])
+                                .update({
+                              'name': nameCtrl.text.trim(),
+                              'username': usernameCtrl.text.trim(),
+                              'email': emailCtrl.text.trim(),
+                              'role': selectedRole.toLowerCase(),
+                              'status': selectedStatus,
+                            });
                           } else {
-                            _users.add(newUser);
+                            final cred = await FirebaseAuth.instance
+                                .createUserWithEmailAndPassword(
+                                    email: emailCtrl.text.trim(),
+                                    password: passCtrl.text.trim());
+                            await FirebaseFirestore.instance
+                                .collection('users')
+                                .doc(cred.user!.uid)
+                                .set({
+                              'name': nameCtrl.text.trim(),
+                              'username': usernameCtrl.text.trim(),
+                              'email': emailCtrl.text.trim(),
+                              'role': selectedRole.toLowerCase(),
+                              'status': selectedStatus,
+                              'createdAt': FieldValue.serverTimestamp(),
+                            });
                           }
-                          _filtered = List.from(_users);
-                        });
-                        Navigator.pop(context);
+                          if (context.mounted) Navigator.pop(context);
+                        } on FirebaseAuthException catch (e) {
+                          if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(e.message ?? 'Error'), backgroundColor: Colors.red));
+                        } catch (e) {
+                          if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+                        }
                       },
                       style: ElevatedButton.styleFrom(backgroundColor: _red, foregroundColor: Colors.white),
                       child: Text(isEdit ? '💾 Update' : '💾 Save'),
@@ -345,7 +393,8 @@ class _AdminUsersState extends State<AdminUsers> {
             ]),
           ),
         ),
-      ),
+      );
+      },
     );
   }
 
@@ -358,12 +407,17 @@ class _AdminUsersState extends State<AdminUsers> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           TextButton(
-            onPressed: () {
-              setState(() {
-                _users.removeWhere((e) => e['username'] == u['username']);
-                _filtered = List.from(_users);
-              });
+            onPressed: () async {
               Navigator.pop(context);
+              try {
+                await FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(u['uid'])
+                    .delete();
+              } catch (e) {
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+              }
             },
             child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'login.dart';
 import 'profile.dart';
 import 'staff_inventory.dart';
@@ -18,6 +20,32 @@ class _StaffDashboardState extends State<StaffDashboard> {
   int _currentIndex = 0;
   static const _red = Color(0xFFE8001C);
   static const _bg = Color(0xFFF7F8FA);
+  String _initials = '?';
+  String? _photoUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInitials();
+  }
+
+  Future<void> _loadInitials() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+    final data = doc.data() ?? {};
+    final name = data['name'] as String? ?? '';
+    final photo = data['photoUrl'] as String?;
+    if (name.isEmpty && photo == null) return;
+    String ini = '?';
+    if (name.isNotEmpty) {
+      final parts = name.trim().split(' ');
+      ini = parts.length >= 2
+          ? '${parts[0][0]}${parts[1][0]}'.toUpperCase()
+          : parts[0][0].toUpperCase();
+    }
+    if (mounted) setState(() { _initials = ini; _photoUrl = photo; });
+  }
 
   final List<_NavItem> _navItems = const [
     _NavItem(icon: Icons.dashboard_outlined, label: 'Dashboard'),
@@ -62,9 +90,13 @@ class _StaffDashboardState extends State<StaffDashboard> {
         CircleAvatar(
           radius: 16,
           backgroundColor: Colors.white24,
+          backgroundImage: _photoUrl != null ? NetworkImage(_photoUrl!) : null,
           child: GestureDetector(
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const UserProfile(role: UserRole.staff))),
-            child: const Text('ST', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const UserProfile(role: UserRole.staff)))
+                .then((_) => _loadInitials()),
+            child: _photoUrl == null
+                ? Text(_initials, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))
+                : null,
           ),
         ),
         const SizedBox(width: 12),

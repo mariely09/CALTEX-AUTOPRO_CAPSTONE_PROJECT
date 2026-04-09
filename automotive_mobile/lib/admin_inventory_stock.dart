@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'barcode_scanner_screen.dart';
 
 class AdminInventoryStock extends StatefulWidget {
@@ -10,22 +11,15 @@ class AdminInventoryStock extends StatefulWidget {
 
 class _AdminInventoryStockState extends State<AdminInventoryStock> {
   static const _red = Color(0xFFE8001C);
+  static const _stockCol = 'stock_inventory';
+  static const _masterCol = 'item_master';
 
-  final List<Map<String, dynamic>> _items = [
-    {'name': 'Engine Oil 10W-40', 'num': 'ITM-001', 'group': 'Lubricants', 'stock': 24, 'min': 10, 'max': 50, 'reorder': 20, 'unit': 'L', 'status': 'OK'},
-    {'name': 'Oil Filter', 'num': 'ITM-002', 'group': 'Filters', 'stock': 3, 'min': 5, 'max': 20, 'reorder': 10, 'unit': 'pcs', 'status': 'Low'},
-    {'name': 'Brake Pads', 'num': 'ITM-003', 'group': 'Brakes', 'stock': 8, 'min': 4, 'max': 20, 'reorder': 8, 'unit': 'set', 'status': 'OK'},
-    {'name': 'Air Filter', 'num': 'ITM-004', 'group': 'Filters', 'stock': 2, 'min': 5, 'max': 15, 'reorder': 10, 'unit': 'pcs', 'status': 'Low'},
-  ];
-
-  List<Map<String, dynamic>> _filtered = [];
   final _searchCtrl = TextEditingController();
+  bool _searching = false;
+  String _searchQuery = '';
 
-  @override
-  void initState() {
-    super.initState();
-    _filtered = List.from(_items);
-  }
+  CollectionReference get _db => FirebaseFirestore.instance.collection(_stockCol);
+  CollectionReference get _masterDb => FirebaseFirestore.instance.collection(_masterCol);
 
   @override
   void dispose() {
@@ -33,26 +27,43 @@ class _AdminInventoryStockState extends State<AdminInventoryStock> {
     super.dispose();
   }
 
-  void _onSearch(String q) {
-    setState(() {
-      _filtered = _items.where((i) =>
-        (i['name'] as String).toLowerCase().contains(q.toLowerCase()) ||
-        (i['num'] as String).toLowerCase().contains(q.toLowerCase()) ||
-        (i['group'] as String).toLowerCase().contains(q.toLowerCase())
-      ).toList();
-    });
+  Future<Map<String, dynamic>?> _findItemMaster(String query) async {
+    if (query.isEmpty) return null;
+    final q = query.trim();
+    // search by barcode
+    var snap = await _masterDb.where('barcode', isEqualTo: q).limit(1).get();
+    if (snap.docs.isNotEmpty) return _docToMaster(snap.docs.first);
+    // search by qr
+    snap = await _masterDb.where('qr', isEqualTo: q).limit(1).get();
+    if (snap.docs.isNotEmpty) return _docToMaster(snap.docs.first);
+    // search by num
+    snap = await _masterDb.where('num', isEqualTo: q.toUpperCase()).limit(1).get();
+    if (snap.docs.isNotEmpty) return _docToMaster(snap.docs.first);
+    // search by name (prefix)
+    snap = await _masterDb.orderBy('name').startAt([q]).endAt(['$q\uf8ff']).limit(1).get();
+    if (snap.docs.isNotEmpty) return _docToMaster(snap.docs.first);
+    return null;
   }
 
-  int get _lowCount => _items.where((i) => i['status'] == 'Low').length;
-
-  bool _searching = false;
+  Map<String, dynamic> _docToMaster(DocumentSnapshot doc) {
+    final d = doc.data() as Map<String, dynamic>;
+    return {
+      'id': doc.id,
+      'num': d['num'] ?? '',
+      'name': d['name'] ?? '',
+      'group': d['group'] ?? '',
+      'uom': d['uom'] ?? '',
+      'barcode': d['barcode'] ?? '',
+      'qr': d['qr'] ?? '',
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showActionChoice(),
+        onPressed: _showActionChoice,
         backgroundColor: _red,
         child: const Icon(Icons.add, color: Colors.white, size: 28),
       ),
@@ -64,7 +75,7 @@ class _AdminInventoryStockState extends State<AdminInventoryStock> {
             ? TextField(
                 controller: _searchCtrl,
                 autofocus: true,
-                onChanged: _onSearch,
+                onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
                 style: const TextStyle(color: Colors.white),
                 decoration: const InputDecoration(
                   hintText: 'Search items...',
@@ -77,42 +88,80 @@ class _AdminInventoryStockState extends State<AdminInventoryStock> {
         actions: [
           IconButton(
             icon: Icon(_searching ? Icons.close : Icons.search, color: Colors.white),
-            onPressed: () {
-              setState(() {
-                _searching = !_searching;
-                if (!_searching) {
-                  _searchCtrl.clear();
-                  _filtered = List.from(_items);
-                }
-              });
-            },
+            onPressed: () => setState(() {
+              _searching = !_searching;
+              if (!_searching) { _searchCtrl.clear(); _searchQuery = ''; }
+            }),
           ),
         ],
       ),
-      body: Column(children: [
-        // Stats
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: Row(children: [
-            _statChip('Total Items', '${_items.length}', Colors.blue),
-            const SizedBox(width: 8),
-            _statChip('Low Stock', '$_lowCount', _red),
-            const SizedBox(width: 8),
-            _statChip('Total Value', '₱52K', Colors.green),
-          ]),
-        ),
-        // List
-        Expanded(
-          child: _filtered.isEmpty
-            ? const Center(child: Text('No items found.', style: TextStyle(color: Color(0xFF718096))))
-            : ListView.separated(
-                padding: const EdgeInsets.all(16),
-                itemCount: _filtered.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (_, i) => _stockCard(_filtered[i]),
-              ),
-        ),
-      ]),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: _db.orderBy('name').snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+
+          final docs = snapshot.data?.docs ?? [];
+          final items = docs.map((d) {
+            final data = d.data() as Map<String, dynamic>;
+            final stock = (data['stock'] as num?)?.toInt() ?? 0;
+            final min = (data['min'] as num?)?.toInt() ?? 0;
+            final max = (data['max'] as num?)?.toInt() ?? 0;
+            return {
+              'id': d.id,
+              'num': data['num'] as String? ?? '',
+              'name': data['name'] as String? ?? '',
+              'group': data['group'] as String? ?? '',
+              'uom': data['uom'] as String? ?? '',
+              'stock': stock,
+              'min': min,
+              'max': max,
+              'reorder': (data['reorder'] as num?)?.toInt() ?? 0,
+              'status': stock >= min ? (stock > max ? 'Over' : 'OK') : 'Low',
+            };
+          }).toList();
+
+          final filtered = _searchQuery.isEmpty
+              ? items
+              : items.where((i) =>
+                  (i['name'] as String).toLowerCase().contains(_searchQuery) ||
+                  (i['num'] as String).toLowerCase().contains(_searchQuery) ||
+                  (i['group'] as String).toLowerCase().contains(_searchQuery)).toList();
+
+          final total = items.length;
+          final lowCount = items.where((i) => i['status'] == 'Low').length;
+          final totalValue = items.fold<double>(0, (sum, i) {
+            return sum;
+          });
+
+          return Column(children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: Row(children: [
+                _statChip('Total Items', '$total', Colors.blue),
+                const SizedBox(width: 8),
+                _statChip('Low Stock', '$lowCount', _red),
+                const SizedBox(width: 8),
+                _statChip('In Stock', '${items.where((i) => i['status'] == 'OK').length}', Colors.green),
+              ]),
+            ),
+            Expanded(
+              child: filtered.isEmpty
+                ? const Center(child: Text('No items found.', style: TextStyle(color: Color(0xFF718096))))
+                : ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (_, i) => _stockCard(filtered[i]),
+                  ),
+            ),
+          ]);
+        },
+      ),
     );
   }
 
@@ -131,17 +180,15 @@ class _AdminInventoryStockState extends State<AdminInventoryStock> {
   }
 
   Widget _stockCard(Map<String, dynamic> item) {
-    final isLow = item['status'] == 'Low';
+    final status = item['status'] as String;
+    final isLow = status == 'Low';
+    final isOver = status == 'Over';
     final stock = item['stock'] as int;
     final min = item['min'] as int;
     final max = item['max'] as int;
-    final isOverMax = stock > max;
-    // progress: clamp to 1.0 but show over-max visually
-    final progress = (stock / max).clamp(0.0, 1.0);
-    // color logic: low=orange, over max=purple, in stock=green
-    final barColor = isLow ? Colors.orange : isOverMax ? Colors.purple : Colors.green;
-    final statusLabel = isLow ? 'Low Stock' : isOverMax ? 'Over Max' : 'In Stock';
-    final statusColor = isLow ? Colors.orange : isOverMax ? Colors.purple : Colors.green;
+    final progress = max > 0 ? (stock / max).clamp(0.0, 1.0) : 0.0;
+    final barColor = isLow ? Colors.orange : isOver ? Colors.purple : Colors.green;
+    final statusLabel = isLow ? 'Low Stock' : isOver ? 'Over Max' : 'In Stock';
 
     return GestureDetector(
       onTap: () => _showStockDetails(item),
@@ -151,14 +198,14 @@ class _AdminInventoryStockState extends State<AdminInventoryStock> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: isLow ? Border.all(color: Colors.orange.shade200)
-            : isOverMax ? Border.all(color: Colors.purple.shade200) : null,
+              : isOver ? Border.all(color: Colors.purple.shade200) : null,
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)],
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
             Container(width: 42, height: 42,
               decoration: BoxDecoration(
-                color: isLow ? Colors.orange.shade50 : isOverMax ? Colors.purple.shade50 : Colors.green.shade50,
+                color: isLow ? Colors.orange.shade50 : isOver ? Colors.purple.shade50 : Colors.green.shade50,
                 borderRadius: BorderRadius.circular(10)),
               child: Icon(Icons.inventory_2_outlined, color: barColor, size: 20)),
             const SizedBox(width: 12),
@@ -167,9 +214,8 @@ class _AdminInventoryStockState extends State<AdminInventoryStock> {
               Text('${item['num']} • ${item['group']}', style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
             ])),
             Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              Text('$stock ${item['unit']}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16,
-                color: statusColor)),
-              Text(statusLabel, style: TextStyle(fontSize: 10, color: statusColor, fontWeight: FontWeight.w500)),
+              Text('$stock ${item['uom']}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: barColor)),
+              Text(statusLabel, style: TextStyle(fontSize: 10, color: barColor, fontWeight: FontWeight.w500)),
             ]),
             const SizedBox(width: 4),
             PopupMenuButton<String>(
@@ -185,28 +231,19 @@ class _AdminInventoryStockState extends State<AdminInventoryStock> {
             ),
           ]),
           const SizedBox(height: 10),
-          // Stock level bar
-          Stack(children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: progress,
-                backgroundColor: const Color(0xFFe2e8f0),
-                valueColor: AlwaysStoppedAnimation<Color>(barColor),
-                minHeight: 6,
-              ),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: const Color(0xFFe2e8f0),
+              valueColor: AlwaysStoppedAnimation<Color>(barColor),
+              minHeight: 6,
             ),
-            // Over-max indicator: small overflow marker at the end
-            if (isOverMax)
-              Positioned(
-                right: 0, top: 0, bottom: 0,
-                child: Container(width: 6, decoration: BoxDecoration(color: Colors.purple, borderRadius: BorderRadius.circular(4))),
-              ),
-          ]),
+          ),
           const SizedBox(height: 4),
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Text('Min: $min', style: const TextStyle(fontSize: 10, color: Color(0xFF718096))),
-            Text('$stock / $max', style: TextStyle(fontSize: 10, color: statusColor, fontWeight: FontWeight.w500)),
+            Text('$stock / $max', style: TextStyle(fontSize: 10, color: barColor, fontWeight: FontWeight.w500)),
             Text('Max: $max', style: const TextStyle(fontSize: 10, color: Color(0xFF718096))),
           ]),
         ]),
@@ -226,26 +263,19 @@ class _AdminInventoryStockState extends State<AdminInventoryStock> {
           const SizedBox(height: 6),
           const Text('Choose an action below', style: TextStyle(fontSize: 12, color: Color(0xFF718096))),
           const SizedBox(height: 20),
-          // Receive Items
           GestureDetector(
-            onTap: () {
-              Navigator.pop(context);
-              _showReceiveModal(null);
-            },
+            onTap: () { Navigator.pop(context); _showReceiveModal(); },
             child: Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFebf8ff),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFF90cdf4)),
-              ),
+              decoration: BoxDecoration(color: const Color(0xFFebf8ff), borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFF90cdf4))),
               child: Row(children: [
                 Container(width: 48, height: 48,
                   decoration: BoxDecoration(color: const Color(0xFF003087), borderRadius: BorderRadius.circular(12)),
                   child: const Icon(Icons.download_outlined, color: Colors.white, size: 24)),
                 const SizedBox(width: 14),
                 const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Receive Items', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1a202c))),
+                  Text('Receive Items', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                   Text('Update stock from delivery', style: TextStyle(fontSize: 12, color: Color(0xFF718096))),
                 ])),
                 const Icon(Icons.chevron_right, color: Color(0xFF718096)),
@@ -253,26 +283,19 @@ class _AdminInventoryStockState extends State<AdminInventoryStock> {
             ),
           ),
           const SizedBox(height: 12),
-          // Add Stock Item
           GestureDetector(
-            onTap: () {
-              Navigator.pop(context);
-              _showAddStockModal();
-            },
+            onTap: () { Navigator.pop(context); _showAddStockModal(); },
             child: Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF0F4FF),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFbee3f8)),
-              ),
+              decoration: BoxDecoration(color: const Color(0xFFF0F4FF), borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFbee3f8))),
               child: Row(children: [
                 Container(width: 48, height: 48,
                   decoration: BoxDecoration(color: _red, borderRadius: BorderRadius.circular(12)),
                   child: const Icon(Icons.add_box_outlined, color: Colors.white, size: 24)),
                 const SizedBox(width: 14),
                 const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Add Stock Item', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1a202c))),
+                  Text('Add Stock Item', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                   Text('Add a new item to inventory', style: TextStyle(fontSize: 12, color: Color(0xFF718096))),
                 ])),
                 const Icon(Icons.chevron_right, color: Color(0xFF718096)),
@@ -285,7 +308,6 @@ class _AdminInventoryStockState extends State<AdminInventoryStock> {
   }
 
   void _showStockDetails(Map<String, dynamic> item) {
-    final isLow = item['status'] == 'Low';
     showModalBottomSheet(
       context: context, isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
@@ -297,11 +319,9 @@ class _AdminInventoryStockState extends State<AdminInventoryStock> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-              decoration: const BoxDecoration(
-                color: _red,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+              decoration: const BoxDecoration(color: _red,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+              child: Row(children: [
                 Container(width: 44, height: 44,
                   decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(12)),
                   child: const Icon(Icons.inventory_2_outlined, color: Colors.white, size: 22)),
@@ -320,10 +340,10 @@ class _AdminInventoryStockState extends State<AdminInventoryStock> {
                 _detailRow('Item Number', item['num'] as String),
                 _detailRow('Item Name', item['name'] as String),
                 _detailRow('Commodity Group', item['group'] as String),
-                _detailRow('Current Stock', '${item['stock']} ${item['unit']}'),
-                _detailRow('Minimum Level', '${item['min']} ${item['unit']}'),
-                _detailRow('Maximum Level', '${item['max']} ${item['unit']}'),
-                _detailRow('Reorder Quantity', '${item['reorder']} ${item['unit']}'),
+                _detailRow('Current Stock', '${item['stock']} ${item['uom']}'),
+                _detailRow('Min Level', '${item['min']} ${item['uom']}'),
+                _detailRow('Max Level', '${item['max']} ${item['uom']}'),
+                _detailRow('Reorder Qty', '${item['reorder']} ${item['uom']}'),
                 _detailRow('Status', item['status'] as String),
                 const SizedBox(height: 16),
                 Row(children: [
@@ -349,10 +369,11 @@ class _AdminInventoryStockState extends State<AdminInventoryStock> {
     );
   }
 
-  void _showReceiveModal(Map<String, dynamic>? preSelected) {
-    Map<String, dynamic>? selectedItem = preSelected;
+  void _showReceiveModal() {
     final scanCtrl = TextEditingController();
     final qtyCtrl = TextEditingController();
+    Map<String, dynamic>? foundStock;
+    bool searching = false;
 
     showModalBottomSheet(
       context: context, isScrollControlled: true,
@@ -363,15 +384,12 @@ class _AdminInventoryStockState extends State<AdminInventoryStock> {
           builder: (_, ctrl) => SingleChildScrollView(
             controller: ctrl,
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              // Red header
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-                decoration: const BoxDecoration(
-                  color: _red,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                ),
-                child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                decoration: const BoxDecoration(color: Color(0xFF003087),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+                child: Row(children: [
                   Container(width: 44, height: 44,
                     decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(12)),
                     child: const Icon(Icons.download_outlined, color: Colors.white, size: 22)),
@@ -384,226 +402,273 @@ class _AdminInventoryStockState extends State<AdminInventoryStock> {
                     child: const Icon(Icons.close, color: Colors.white)),
                 ]),
               ),
-              // Form content
               Padding(
                 padding: EdgeInsets.only(left: 20, right: 20, top: 20,
                   bottom: MediaQuery.of(context).viewInsets.bottom + 24),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-
-              // Scan section
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFebf8ff),
-                  border: Border.all(color: const Color(0xFF90cdf4)),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Row(children: [
-                    Icon(Icons.qr_code_scanner, color: Color(0xFF003087), size: 18),
-                    SizedBox(width: 6),
-                    Text('Scan Item', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF003087), fontSize: 13)),
-                  ]),
-                  const SizedBox(height: 10),
+                  // Scan row
                   Row(children: [
-                    Expanded(
-                      child: TextField(
-                        controller: scanCtrl,
-                        decoration: InputDecoration(
-                          hintText: 'Barcode, QR code, or item name...',
-                          filled: true, fillColor: Colors.white,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: Color(0xFF90cdf4))),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        ),
-                        onSubmitted: (v) {
-                          final match = _findItem(v);
-                          setModal(() => selectedItem = match);
-                        },
+                    Expanded(child: TextField(
+                      controller: scanCtrl,
+                      decoration: const InputDecoration(
+                        hintText: 'Barcode, QR, item number or name...',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.search),
                       ),
-                    ),
+                      onSubmitted: (_) async {
+                        setModal(() => searching = true);
+                        final master = await _findItemMaster(scanCtrl.text);
+                        if (master != null) {
+                          final stockSnap = await _db.where('num', isEqualTo: master['num']).limit(1).get();
+                          foundStock = stockSnap.docs.isNotEmpty
+                              ? {'id': stockSnap.docs.first.id, ...stockSnap.docs.first.data() as Map<String, dynamic>}
+                              : null;
+                        } else {
+                          foundStock = null;
+                        }
+                        setModal(() => searching = false);
+                      },
+                    )),
                     const SizedBox(width: 8),
-                    // Camera scan
                     IconButton(
-                      style: IconButton.styleFrom(
-                        backgroundColor: const Color(0xFF003087),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        padding: const EdgeInsets.all(10),
-                      ),
+                      style: IconButton.styleFrom(backgroundColor: const Color(0xFF003087),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)), padding: const EdgeInsets.all(10)),
                       icon: const Icon(Icons.qr_code_scanner, color: Colors.white, size: 22),
                       onPressed: () async {
                         final result = await Navigator.push<String>(context,
                           MaterialPageRoute(builder: (_) => const BarcodeScannerScreen()));
                         if (result != null) {
                           scanCtrl.text = result;
-                          final match = _findItem(result);
-                          setModal(() => selectedItem = match);
+                          setModal(() => searching = true);
+                          final master = await _findItemMaster(result);
+                          if (master != null) {
+                            final stockSnap = await _db.where('num', isEqualTo: master['num']).limit(1).get();
+                            foundStock = stockSnap.docs.isNotEmpty
+                                ? {'id': stockSnap.docs.first.id, ...stockSnap.docs.first.data() as Map<String, dynamic>}
+                                : null;
+                          } else { foundStock = null; }
+                          setModal(() => searching = false);
                         }
                       },
                     ),
                     const SizedBox(width: 8),
                     ElevatedButton(
-                      onPressed: () {
-                        final match = _findItem(scanCtrl.text.trim());
-                        setModal(() => selectedItem = match);
+                      onPressed: () async {
+                        setModal(() => searching = true);
+                        final master = await _findItemMaster(scanCtrl.text);
+                        if (master != null) {
+                          final stockSnap = await _db.where('num', isEqualTo: master['num']).limit(1).get();
+                          foundStock = stockSnap.docs.isNotEmpty
+                              ? {'id': stockSnap.docs.first.id, ...stockSnap.docs.first.data() as Map<String, dynamic>}
+                              : null;
+                        } else { foundStock = null; }
+                        setModal(() => searching = false);
                       },
                       style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF003087), foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
                       child: const Text('Search'),
                     ),
                   ]),
+                  const SizedBox(height: 12),
+                  if (searching) const Center(child: CircularProgressIndicator()),
+                  if (!searching && foundStock != null) ...[
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(color: const Color(0xFFebf8ff),
+                        border: Border.all(color: const Color(0xFF90cdf4)), borderRadius: BorderRadius.circular(12)),
+                      child: Row(children: [
+                        Container(width: 44, height: 44,
+                          decoration: BoxDecoration(color: const Color(0xFF003087), borderRadius: BorderRadius.circular(10)),
+                          child: const Icon(Icons.inventory_2_outlined, color: Colors.white, size: 22)),
+                        const SizedBox(width: 12),
+                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text(foundStock!['name'] as String? ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                          Text('${foundStock!['num']} • ${foundStock!['group']}',
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
+                          Text('Current stock: ${foundStock!['stock']} ${foundStock!['uom']}',
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF2c5282), fontWeight: FontWeight.w500)),
+                        ])),
+                        GestureDetector(onTap: () => setModal(() { foundStock = null; scanCtrl.clear(); }),
+                          child: const Icon(Icons.close, size: 18, color: Color(0xFF718096))),
+                      ]),
+                    ),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: qtyCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'Quantity Received *',
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.add_box_outlined),
+                        helperText: 'Will be added to current stock of ${foundStock!['stock']} ${foundStock!['uom']}',
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(children: [
+                      Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel'))),
+                      const SizedBox(width: 12),
+                      Expanded(child: ElevatedButton(
+                        onPressed: () async {
+                          final qty = int.tryParse(qtyCtrl.text) ?? 0;
+                          if (qty <= 0) return;
+                          final currentStock = (foundStock!['stock'] as num?)?.toInt() ?? 0;
+                          final newStock = currentStock + qty;
+                          final min = (foundStock!['min'] as num?)?.toInt() ?? 0;
+                          try {
+                            await _db.doc(foundStock!['id'] as String).update({
+                              'stock': newStock,
+                              'status': newStock >= min ? 'OK' : 'Low',
+                              'updatedAt': FieldValue.serverTimestamp(),
+                            });
+                            if (context.mounted) Navigator.pop(context);
+                          } catch (e) {
+                            if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF003087), foregroundColor: Colors.white),
+                        child: const Text('✅ Confirm'),
+                      )),
+                    ]),
+                  ] else if (!searching && scanCtrl.text.isNotEmpty && foundStock == null)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.red.shade200)),
+                      child: const Row(children: [
+                        Icon(Icons.error_outline, color: Colors.red, size: 16),
+                        SizedBox(width: 8),
+                        Text('No stock item found for that code.', style: TextStyle(color: Colors.red, fontSize: 12)),
+                      ]),
+                    ),
                 ]),
               ),
-              const SizedBox(height: 12),
-
-              // Item found / not found feedback
-              if (selectedItem != null) ...[
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFebf8ff),
-                    border: Border.all(color: const Color(0xFF90cdf4)),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(children: [
-                    Container(width: 44, height: 44,
-                      decoration: BoxDecoration(color: const Color(0xFF003087), borderRadius: BorderRadius.circular(10)),
-                      child: const Icon(Icons.inventory_2_outlined, color: Colors.white, size: 22)),
-                    const SizedBox(width: 12),
-                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(selectedItem!['name'] as String,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                      Text('${selectedItem!['num']} • ${selectedItem!['group']}',
-                        style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
-                      Text('Current stock: ${selectedItem!['stock']} ${selectedItem!['unit']}',
-                        style: const TextStyle(fontSize: 11, color: Color(0xFF2c5282), fontWeight: FontWeight.w500)),
-                    ])),
-                    GestureDetector(
-                      onTap: () => setModal(() { selectedItem = null; scanCtrl.clear(); }),
-                      child: const Icon(Icons.close, size: 18, color: Color(0xFF718096)),
-                    ),
-                  ]),
-                ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: qtyCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: 'Quantity Received *',
-                    border: const OutlineInputBorder(),
-                    prefixIcon: const Icon(Icons.add_box_outlined),
-                    helperText: 'Will be added to current stock of ${selectedItem!['stock']} ${selectedItem!['unit']}',
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Row(children: [
-                  Expanded(child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Cancel'))),
-                  const SizedBox(width: 12),
-                  Expanded(child: ElevatedButton(
-                    onPressed: () {
-                      final qty = int.tryParse(qtyCtrl.text) ?? 0;
-                      if (qty <= 0) return;
-                      setState(() {
-                        final idx = _items.indexWhere((e) => e['num'] == selectedItem!['num']);
-                        if (idx != -1) {
-                          _items[idx]['stock'] = (_items[idx]['stock'] as int) + qty;
-                          _items[idx]['status'] = _items[idx]['stock'] >= _items[idx]['min'] ? 'OK' : 'Low';
-                          _filtered = List.from(_items);
-                        }
-                      });
-                      Navigator.pop(context);
-                    },
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF003087), foregroundColor: Colors.white),
-                    child: const Text('✅ Confirm Receive'),
-                  )),
-                ]),
-              ] else if (scanCtrl.text.isNotEmpty)
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.red.shade200)),
-                  child: const Row(children: [
-                    Icon(Icons.error_outline, color: Colors.red, size: 16),
-                    SizedBox(width: 8),
-                    Text('No item found for that code.', style: TextStyle(color: Colors.red, fontSize: 12)),
-                  ]),
-                ),
-                ]), // end Padding Column
-              ), // end Padding
-            ]), // end outer Column
+            ]),
           ),
         ),
       ),
     );
   }
 
-  Map<String, dynamic>? _findItem(String query) {
-    if (query.isEmpty) return null;
-    final q = query.toLowerCase();
-    // Search in stock items first
-    final inStock = _items.where((e) =>
-      (e['num'] as String).toLowerCase() == q ||
-      (e['name'] as String).toLowerCase().contains(q)
-    ).firstOrNull;
-    if (inStock != null) return inStock;
-    // Search in item master by barcode/qr
-    final master = _itemMaster.where((e) =>
-      e['barcode'] == query || e['qr'] == query ||
-      e['name']!.toLowerCase().contains(q) ||
-      e['num']!.toLowerCase() == q
-    ).firstOrNull;
-    if (master != null) {
-      // Return as stock item format if exists, else null
-      return _items.where((e) => e['num'] == master['num']).firstOrNull;
+  void _showAddStockModal({Map<String, dynamic>? item}) {
+    if (item != null) {
+      _showEditStockModal(item);
+      return;
     }
-    return null;
+    _showNewStockModal();
   }
 
-  // Mock item master data for scan lookup
-  final List<Map<String, String>> _itemMaster = [
-    {'num': 'ITM-001', 'name': 'Engine Oil 10W-40', 'group': 'Lubricants', 'unit': 'L', 'barcode': '1234567890', 'qr': 'QR-ITM-001'},
-    {'num': 'ITM-002', 'name': 'Oil Filter', 'group': 'Filters', 'unit': 'pcs', 'barcode': '0987654321', 'qr': 'QR-ITM-002'},
-    {'num': 'ITM-003', 'name': 'Brake Pads', 'group': 'Brakes', 'unit': 'set', 'barcode': '1122334455', 'qr': 'QR-ITM-003'},
-    {'num': 'ITM-004', 'name': 'Air Filter', 'group': 'Filters', 'unit': 'pcs', 'barcode': '5544332211', 'qr': 'QR-ITM-004'},
-    {'num': 'ITM-005', 'name': 'Coolant', 'group': 'Fluids', 'unit': 'L', 'barcode': '6677889900', 'qr': 'QR-ITM-005'},
-  ];
+  void _showEditStockModal(Map<String, dynamic> item) {
+    final stockCtrl = TextEditingController(text: '${item['stock']}');
+    final minCtrl = TextEditingController(text: '${item['min']}');
+    final maxCtrl = TextEditingController(text: '${item['max']}');
+    final reorderCtrl = TextEditingController(text: '${item['reorder']}');
 
-  void _confirmDelete(Map<String, dynamic> item) {
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Delete Item'),
-        content: Text('Are you sure you want to delete "${item['name']}"?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () {
-              setState(() {
-                _items.removeWhere((e) => e['num'] == item['num']);
-                _filtered = List.from(_items);
-              });
-              Navigator.pop(context);
-            },
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+      isScrollControlled: true,
+      isDismissible: true,
+      enableDrag: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (sheetCtx, _) => AnimatedPadding(
+          duration: const Duration(milliseconds: 150),
+          padding: EdgeInsets.only(bottom: MediaQuery.of(sheetCtx).viewInsets.bottom),
+          child: SingleChildScrollView(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              // Header
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+                decoration: const BoxDecoration(color: _red,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+                child: Row(children: [
+                  Container(width: 44, height: 44,
+                    decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(12)),
+                    child: const Icon(Icons.edit_outlined, color: Colors.white, size: 22)),
+                  const SizedBox(width: 12),
+                  const Expanded(child: Text('Edit Stock Item',
+                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))),
+                  GestureDetector(onTap: () => Navigator.pop(sheetCtx),
+                    child: const Icon(Icons.close, color: Colors.white)),
+                ]),
+              ),
+              // Form
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(color: const Color(0xFFF7F8FA), borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFe2e8f0))),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      _infoRow('Item Number', item['num'] as String),
+                      _infoRow('Item Name', item['name'] as String),
+                      _infoRow('Group', item['group'] as String),
+                      _infoRow('UOM', item['uom'] as String),
+                    ]),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Stock Level Settings', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  const SizedBox(height: 10),
+                  TextField(controller: stockCtrl, keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Current Quantity *', border: OutlineInputBorder())),
+                  const SizedBox(height: 10),
+                  Row(children: [
+                    Expanded(child: TextField(controller: minCtrl, keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Min Level *', border: OutlineInputBorder()))),
+                    const SizedBox(width: 10),
+                    Expanded(child: TextField(controller: maxCtrl, keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Max Level *', border: OutlineInputBorder()))),
+                  ]),
+                  const SizedBox(height: 10),
+                  TextField(controller: reorderCtrl, keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Reorder Quantity *', border: OutlineInputBorder())),
+                  const SizedBox(height: 20),
+                  Row(children: [
+                    Expanded(child: OutlinedButton(
+                      onPressed: () => Navigator.pop(sheetCtx),
+                      child: const Text('Cancel'))),
+                    const SizedBox(width: 12),
+                    Expanded(child: ElevatedButton(
+                      onPressed: () async {
+                        final stock = int.tryParse(stockCtrl.text) ?? 0;
+                        final min = int.tryParse(minCtrl.text) ?? 0;
+                        final max = int.tryParse(maxCtrl.text) ?? 0;
+                        final reorder = int.tryParse(reorderCtrl.text) ?? 0;
+                        try {
+                          await _db.doc(item['id'] as String).update({
+                            'stock': stock, 'min': min, 'max': max, 'reorder': reorder,
+                            'status': stock >= min ? 'OK' : 'Low',
+                            'updatedAt': FieldValue.serverTimestamp(),
+                          });
+                          if (sheetCtx.mounted) Navigator.pop(sheetCtx);
+                        } catch (e) {
+                          if (sheetCtx.mounted) ScaffoldMessenger.of(sheetCtx).showSnackBar(
+                            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(backgroundColor: _red, foregroundColor: Colors.white),
+                      child: const Text('💾 Update'),
+                    )),
+                  ]),
+                ]),
+              ),
+            ]),
           ),
-        ],
+        ),
       ),
     );
   }
 
-  void _showAddStockModal({Map<String, dynamic>? item}) {
-    final isEdit = item != null;
+  void _showNewStockModal() {
     final scanCtrl = TextEditingController();
-    final stockCtrl = TextEditingController(text: item != null ? '${item['stock']}' : '');
-    final minCtrl = TextEditingController(text: item != null ? '${item['min']}' : '');
-    final maxCtrl = TextEditingController(text: item != null ? '${item['max']}' : '');
-    final reorderCtrl = TextEditingController(text: item != null ? '${item['reorder']}' : '');
-    Map<String, String>? foundItem = isEdit
-        ? _itemMaster.firstWhere((e) => e['num'] == item!['num'], orElse: () => {})
-        : null;
-    if (foundItem?.isEmpty == true) foundItem = null;
+    final stockCtrl = TextEditingController();
+    final minCtrl = TextEditingController();
+    final maxCtrl = TextEditingController();
+    final reorderCtrl = TextEditingController();
+    Map<String, dynamic>? foundMaster;
+    bool searching = false;
 
     showModalBottomSheet(
       context: context, isScrollControlled: true,
@@ -614,219 +679,210 @@ class _AdminInventoryStockState extends State<AdminInventoryStock> {
           builder: (_, ctrl) => SingleChildScrollView(
             controller: ctrl,
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              // Red header — edge to edge
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-                decoration: const BoxDecoration(
-                  color: _red,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                ),
-                child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                decoration: const BoxDecoration(color: _red,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+                child: Row(children: [
                   Container(width: 44, height: 44,
                     decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(12)),
-                    child: Icon(isEdit ? Icons.edit_outlined : Icons.add_box_outlined, color: Colors.white, size: 22)),
+                    child: const Icon(Icons.add_box_outlined, color: Colors.white, size: 22)),
                   const SizedBox(width: 12),
-                  Expanded(child: Text(isEdit ? 'Edit Stock Item' : 'Add Stock Item',
-                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))),
+                  const Expanded(child: Text('Add Stock Item',
+                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))),
                   GestureDetector(onTap: () => Navigator.pop(context),
                     child: const Icon(Icons.close, color: Colors.white)),
                 ]),
               ),
-              // Form content
               Padding(
                 padding: EdgeInsets.only(left: 20, right: 20, top: 20,
                   bottom: MediaQuery.of(context).viewInsets.bottom + 24),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-
-              // Scan section (hidden in edit mode)
-              if (!isEdit) ...[
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFebf8ff),
-                    border: Border.all(color: const Color(0xFFbee3f8)),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const Row(children: [
-                      Icon(Icons.qr_code_scanner, color: Color(0xFF003087), size: 18),
-                      SizedBox(width: 6),
-                      Text('Scan Item Barcode / QR Code',
-                        style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF003087), fontSize: 13)),
-                    ]),
-                    const SizedBox(height: 10),
-                    Row(children: [
-                      Expanded(
-                        child: TextField(
-                          controller: scanCtrl,
-                          decoration: InputDecoration(
-                            hintText: 'Scan or type barcode / QR code...',
-                            filled: true, fillColor: Colors.white,
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFbee3f8))),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          ),
-                          onSubmitted: (v) {
-                            final match = _itemMaster.where((e) =>
-                              e['barcode'] == v.trim() || e['qr'] == v.trim() ||
-                              e['name']!.toLowerCase().contains(v.toLowerCase()) ||
-                              e['num']!.toLowerCase().contains(v.toLowerCase())
-                            ).firstOrNull;
-                            setModal(() => foundItem = match);
-                          },
-                        ),
+                  Row(children: [
+                    Expanded(child: TextField(
+                      controller: scanCtrl,
+                      decoration: const InputDecoration(
+                        hintText: 'Scan or search item...',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.search),
                       ),
-                      const SizedBox(width: 8),
-                      // Camera scan button
-                      IconButton(
-                        style: IconButton.styleFrom(
-                          backgroundColor: const Color(0xFF003087),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          padding: const EdgeInsets.all(10),
-                        ),
-                        icon: const Icon(Icons.qr_code_scanner, color: Colors.white, size: 22),
-                        onPressed: () async {
-                          final result = await Navigator.push<String>(context,
-                            MaterialPageRoute(builder: (_) => const BarcodeScannerScreen()));
-                          if (result != null) {
-                            scanCtrl.text = result;
-                            final match = _itemMaster.where((e) =>
-                              e['barcode'] == result || e['qr'] == result ||
-                              e['name']!.toLowerCase().contains(result.toLowerCase()) ||
-                              e['num']!.toLowerCase().contains(result.toLowerCase())
-                            ).firstOrNull;
-                            setModal(() => foundItem = match);
-                          }
-                        },
-                      ),
-                      const SizedBox(width: 8),
-                      ElevatedButton(
-                        onPressed: () {
-                          final v = scanCtrl.text.trim();
-                          final match = _itemMaster.where((e) =>
-                            e['barcode'] == v || e['qr'] == v ||
-                            e['name']!.toLowerCase().contains(v.toLowerCase()) ||
-                            e['num']!.toLowerCase().contains(v.toLowerCase())
-                          ).firstOrNull;
-                          setModal(() => foundItem = match);
-                        },
-                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF003087), foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                        child: const Text('Search'),
-                      ),
-                    ]),
-                  ]),
-                ),
-                const SizedBox(height: 12),
-
-                // Found item preview
-                if (foundItem != null)
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFf0fff4),
-                      border: Border.all(color: const Color(0xFF68d391)),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      const Row(children: [
-                        Icon(Icons.check_circle_outline, color: Colors.green, size: 16),
-                        SizedBox(width: 6),
-                        Text('Item Found', style: TextStyle(fontWeight: FontWeight.w700, color: Colors.green, fontSize: 12)),
-                      ]),
-                      const SizedBox(height: 8),
-                      _infoRow('Item Number', foundItem!['num']!),
-                      _infoRow('Item Name', foundItem!['name']!),
-                      _infoRow('Commodity Group', foundItem!['group']!),
-                      _infoRow('Unit', foundItem!['unit']!),
-                    ]),
-                  )
-                else if (scanCtrl.text.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.red.shade200)),
-                    child: const Row(children: [
-                      Icon(Icons.error_outline, color: Colors.red, size: 16),
-                      SizedBox(width: 8),
-                      Text('No item found for that code.', style: TextStyle(color: Colors.red, fontSize: 12)),
-                    ]),
-                  ),
-                const SizedBox(height: 12),
-              ],
-
-              // Edit mode: show item info
-              if (isEdit)
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(color: const Color(0xFFF7F8FA), borderRadius: BorderRadius.circular(12)),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    _infoRow('Item Number', item!['num'] as String),
-                    _infoRow('Item Name', item['name'] as String),
-                    _infoRow('Group', item['group'] as String),
-                    _infoRow('Unit', item['unit'] as String),
-                  ]),
-                ),
-
-              // Stock level fields — show only when item is found or editing
-              if (foundItem != null || isEdit) ...[
-                const SizedBox(height: 14),
-                const Text('Stock Level Settings', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                const SizedBox(height: 10),
-                TextField(controller: stockCtrl, keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Current Quantity *', border: OutlineInputBorder())),
-                const SizedBox(height: 10),
-                Row(children: [
-                  Expanded(child: TextField(controller: minCtrl, keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Min Level *', border: OutlineInputBorder()))),
-                  const SizedBox(width: 10),
-                  Expanded(child: TextField(controller: maxCtrl, keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Max Level *', border: OutlineInputBorder()))),
-                ]),
-                const SizedBox(height: 10),
-                TextField(controller: reorderCtrl, keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Reorder Quantity *', border: OutlineInputBorder())),
-                const SizedBox(height: 20),
-                Row(children: [
-                  Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel'))),
-                  const SizedBox(width: 12),
-                  Expanded(child: ElevatedButton(
-                    onPressed: () {
-                      final src = isEdit ? item! : foundItem!;
-                      final stock = int.tryParse(stockCtrl.text) ?? 0;
-                      final min = int.tryParse(minCtrl.text) ?? 0;
-                      setState(() {
-                        final newItem = {
-                          'num': src['num'],
-                          'name': src['name'],
-                          'group': src['group'],
-                          'unit': src['unit'],
-                          'stock': stock,
-                          'min': min,
-                          'max': int.tryParse(maxCtrl.text) ?? 0,
-                          'reorder': int.tryParse(reorderCtrl.text) ?? 0,
-                          'status': stock >= min ? 'OK' : 'Low',
-                        };
-                        if (isEdit) {
-                          final idx = _items.indexWhere((e) => e['num'] == item!['num']);
-                          if (idx != -1) _items[idx] = newItem;
-                        } else {
-                          _items.add(newItem);
+                      onSubmitted: (_) async {
+                        setModal(() => searching = true);
+                        foundMaster = await _findItemMaster(scanCtrl.text);
+                        setModal(() => searching = false);
+                      },
+                    )),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      style: IconButton.styleFrom(backgroundColor: _red,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.all(10)),
+                      icon: const Icon(Icons.qr_code_scanner, color: Colors.white, size: 22),
+                      onPressed: () async {
+                        final result = await Navigator.push<String>(context,
+                          MaterialPageRoute(builder: (_) => const BarcodeScannerScreen()));
+                        if (result != null) {
+                          scanCtrl.text = result;
+                          setModal(() => searching = true);
+                          foundMaster = await _findItemMaster(result);
+                          setModal(() => searching = false);
                         }
-                        _filtered = List.from(_items);
-                      });
-                      Navigator.pop(context);
-                    },
-                    style: ElevatedButton.styleFrom(backgroundColor: _red, foregroundColor: Colors.white),
-                    child: Text(isEdit ? '💾 Update' : '💾 Save'),
-                  )),
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: () async {
+                        setModal(() => searching = true);
+                        foundMaster = await _findItemMaster(scanCtrl.text);
+                        setModal(() => searching = false);
+                      },
+                      style: ElevatedButton.styleFrom(backgroundColor: _red, foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                      child: const Text('Search'),
+                    ),
+                  ]),
+                  const SizedBox(height: 12),
+                  if (searching) const Center(child: CircularProgressIndicator()),
+                  if (!searching && foundMaster != null)
+                    FutureBuilder<QuerySnapshot>(
+                      future: _db.where('num', isEqualTo: foundMaster!['num']).limit(1).get(),
+                      builder: (ctx, dupSnap) {
+                        if (dupSnap.connectionState == ConnectionState.waiting) return const SizedBox.shrink();
+                        final alreadyExists = (dupSnap.data?.docs.isNotEmpty) == true;
+                        if (alreadyExists) {
+                          return Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(color: Colors.orange.shade50,
+                              border: Border.all(color: Colors.orange.shade300), borderRadius: BorderRadius.circular(12)),
+                            child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Row(children: [
+                                Icon(Icons.warning_amber_outlined, color: Colors.orange, size: 16),
+                                SizedBox(width: 6),
+                                Text('Already in Stock', style: TextStyle(fontWeight: FontWeight.w700, color: Colors.orange, fontSize: 12)),
+                              ]),
+                              SizedBox(height: 6),
+                              Text('This item already exists. Use Edit to update it.',
+                                style: TextStyle(fontSize: 11, color: Colors.orange)),
+                            ]),
+                          );
+                        }
+                        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(color: const Color(0xFFf0fff4),
+                              border: Border.all(color: const Color(0xFF68d391)), borderRadius: BorderRadius.circular(12)),
+                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              const Row(children: [
+                                Icon(Icons.check_circle_outline, color: Colors.green, size: 16),
+                                SizedBox(width: 6),
+                                Text('Item Found', style: TextStyle(fontWeight: FontWeight.w700, color: Colors.green, fontSize: 12)),
+                              ]),
+                              const SizedBox(height: 8),
+                              _infoRow('Item Number', foundMaster!['num'] as String),
+                              _infoRow('Item Name', foundMaster!['name'] as String),
+                              _infoRow('Group', foundMaster!['group'] as String),
+                              _infoRow('UOM', foundMaster!['uom'] as String),
+                            ]),
+                          ),
+                          const SizedBox(height: 14),
+                          const Text('Stock Level Settings', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          const SizedBox(height: 10),
+                          TextField(controller: stockCtrl, keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(labelText: 'Current Quantity *', border: OutlineInputBorder())),
+                          const SizedBox(height: 10),
+                          Row(children: [
+                            Expanded(child: TextField(controller: minCtrl, keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(labelText: 'Min Level *', border: OutlineInputBorder()))),
+                            const SizedBox(width: 10),
+                            Expanded(child: TextField(controller: maxCtrl, keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(labelText: 'Max Level *', border: OutlineInputBorder()))),
+                          ]),
+                          const SizedBox(height: 10),
+                          TextField(controller: reorderCtrl, keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(labelText: 'Reorder Quantity *', border: OutlineInputBorder())),
+                          const SizedBox(height: 20),
+                          Row(children: [
+                            Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel'))),
+                            const SizedBox(width: 12),
+                            Expanded(child: ElevatedButton(
+                              onPressed: () async {
+                                final stock = int.tryParse(stockCtrl.text) ?? 0;
+                                final min = int.tryParse(minCtrl.text) ?? 0;
+                                final max = int.tryParse(maxCtrl.text) ?? 0;
+                                final reorder = int.tryParse(reorderCtrl.text) ?? 0;
+                                final data = <String, dynamic>{
+                                  'num': foundMaster!['num'],
+                                  'name': foundMaster!['name'],
+                                  'group': foundMaster!['group'],
+                                  'uom': foundMaster!['uom'],
+                                  'stock': stock, 'min': min, 'max': max, 'reorder': reorder,
+                                  'status': stock >= min ? 'OK' : 'Low',
+                                  'createdAt': FieldValue.serverTimestamp(),
+                                  'updatedAt': FieldValue.serverTimestamp(),
+                                };
+                                try {
+                                  final existing = await _db.where('num', isEqualTo: foundMaster!['num']).limit(1).get();
+                                  if (existing.docs.isNotEmpty) {
+                                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Already in stock inventory.'), backgroundColor: Colors.orange));
+                                    return;
+                                  }
+                                  await _db.add(data);
+                                  if (context.mounted) Navigator.pop(context);
+                                } catch (e) {
+                                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(backgroundColor: _red, foregroundColor: Colors.white),
+                              child: const Text('💾 Save'),
+                            )),
+                          ]),
+                        ]);
+                      },
+                    )
+                  else if (!searching && scanCtrl.text.isNotEmpty && foundMaster == null)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.red.shade200)),
+                      child: const Row(children: [
+                        Icon(Icons.error_outline, color: Colors.red, size: 16),
+                        SizedBox(width: 8),
+                        Text('No item found.', style: TextStyle(color: Colors.red, fontSize: 12)),
+                      ]),
+                    ),
                 ]),
-              ],
-                ]), // end Padding Column
-              ), // end Padding
-            ]), // end outer Column
+              ),
+            ]),
           ),
         ),
+      ),
+    );
+  }
+
+  void _confirmDelete(Map<String, dynamic> item) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete Item'),
+        content: Text('Delete "${item['name']}"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              try {
+                await _db.doc(item['id'] as String).delete();
+              } catch (e) {
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+              }
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
       ),
     );
   }

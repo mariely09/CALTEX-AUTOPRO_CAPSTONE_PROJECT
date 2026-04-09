@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'login.dart';
 import 'customer_pms.dart';
 import 'profile.dart';
@@ -14,6 +16,32 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
   int _currentIndex = 0;
   static const _red = Color(0xFFE8001C);
   static const _bg = Color(0xFFF7F8FA);
+  String _initials = '?';
+  String? _photoUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInitials();
+  }
+
+  Future<void> _loadInitials() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+    final data = doc.data() ?? {};
+    final name = data['name'] as String? ?? '';
+    final photo = data['photoUrl'] as String?;
+    if (name.isEmpty && photo == null) return;
+    String ini = '?';
+    if (name.isNotEmpty) {
+      final parts = name.trim().split(' ');
+      ini = parts.length >= 2
+          ? '${parts[0][0]}${parts[1][0]}'.toUpperCase()
+          : parts[0][0].toUpperCase();
+    }
+    if (mounted) setState(() { _initials = ini; _photoUrl = photo; });
+  }
 
   final List<({IconData icon, String label})> _navItems = const [
     (icon: Icons.directions_car_outlined, label: 'My Vehicles'),
@@ -54,10 +82,13 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
           icon: const Icon(Icons.notifications_outlined, color: Colors.white),
           onPressed: () => setState(() => _currentIndex = 2),
         ),
-        const CircleAvatar(
+        CircleAvatar(
           radius: 16,
           backgroundColor: Colors.white24,
-          child: Text('JD', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+          backgroundImage: _photoUrl != null ? NetworkImage(_photoUrl!) : null,
+          child: _photoUrl == null
+              ? Text(_initials, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))
+              : null,
         ),
         const SizedBox(width: 12),
       ],
@@ -69,7 +100,9 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
       case 0: return _buildVehicles();
       case 1: return _buildSmartReports();
       case 2: return _buildNotifications();
-      case 3: return const UserProfile(role: UserRole.customer);
+      case 3:
+        _loadInitials(); // refresh initials when profile tab is opened
+        return const UserProfile(role: UserRole.customer);
       case 4: return const CustomerPms();
       default: return _buildVehicles();
     }

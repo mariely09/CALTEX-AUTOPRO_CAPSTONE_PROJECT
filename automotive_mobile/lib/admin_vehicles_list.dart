@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AdminVehiclesList extends StatefulWidget {
   const AdminVehiclesList({super.key});
@@ -350,118 +351,130 @@ class _AdminVehiclesListState extends State<AdminVehiclesList> {
     );
   }
 
+  Future<List<String>> _fetchVehicleTypes() async {
+    final snap = await FirebaseFirestore.instance
+        .collection('domains')
+        .doc('vehicle_types')
+        .collection('items')
+        .orderBy('name')
+        .get();
+    return snap.docs.map((d) => d['name'] as String).toList();
+  }
+
   void _showAddVehicleModal({Map<String, String>? vehicle}) {
     final isEdit = vehicle != null;
     final plateCtrl = TextEditingController(text: vehicle?['plate'] ?? '');
     final descCtrl = TextEditingController(text: vehicle?['desc'] ?? '');
     final ownerCtrl = TextEditingController(text: vehicle?['owner'] ?? '');
     final odoCtrl = TextEditingController(text: vehicle?['odo']?.replaceAll(' km', '').replaceAll(',', '') ?? '');
-    String selectedType = vehicle?['type'] ?? 'truck';
+    String? selectedType = vehicle?['type']?.isNotEmpty == true ? vehicle!['type'] : null;
     String selectedStatus = vehicle?['status'] ?? 'Active';
 
     showModalBottomSheet(
       context: context, isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => StatefulBuilder(
-        builder: (ctx, setModal) => DraggableScrollableSheet(
-          expand: false, initialChildSize: 0.85, maxChildSize: 0.95,
-          builder: (_, ctrl) => SingleChildScrollView(
-            controller: ctrl,
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              // Red header
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-                decoration: const BoxDecoration(color: _red, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-                child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-                  Container(width: 44, height: 44,
-                    decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(12)),
-                    child: Icon(isEdit ? Icons.edit_outlined : Icons.add, color: Colors.white, size: 22)),
-                  const SizedBox(width: 12),
-                  Expanded(child: Text(isEdit ? 'Edit Vehicle' : 'Add Vehicle',
-                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))),
-                  GestureDetector(onTap: () => Navigator.pop(context),
-                    child: const Icon(Icons.close, color: Colors.white)),
-                ]),
-              ),
-              Padding(
-                padding: EdgeInsets.only(left: 20, right: 20, top: 20,
-                  bottom: MediaQuery.of(context).viewInsets.bottom + 24),
+      builder: (_) => FutureBuilder<List<String>>(
+        future: _fetchVehicleTypes(),
+        builder: (ctx, snap) {
+          final types = snap.data ?? [];
+          if (selectedType != null && !types.contains(selectedType)) selectedType = null;
+
+          return StatefulBuilder(
+            builder: (ctx, setModal) => DraggableScrollableSheet(
+              expand: false, initialChildSize: 0.85, maxChildSize: 0.95,
+              builder: (_, ctrl) => SingleChildScrollView(
+                controller: ctrl,
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  TextField(controller: plateCtrl,
-                    textCapitalization: TextCapitalization.characters,
-                    decoration: const InputDecoration(labelText: 'Plate Number *', border: OutlineInputBorder(), hintText: 'e.g. ABC-1234')),
-                  const SizedBox(height: 10),
-                  TextField(controller: descCtrl,
-                    decoration: const InputDecoration(labelText: 'Description *', border: OutlineInputBorder(), hintText: 'e.g. Isuzu Truck NQR 2021')),
-                  const SizedBox(height: 10),
-                  TextField(controller: ownerCtrl,
-                    decoration: const InputDecoration(labelText: 'Owner *', border: OutlineInputBorder())),
-                  const SizedBox(height: 10),
-                  TextField(controller: odoCtrl, keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Current Odometer (km) *', border: OutlineInputBorder(), suffixText: 'km')),
-                  const SizedBox(height: 10),
-                  TextField(
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Last Service Odometer (km)', border: OutlineInputBorder(), suffixText: 'km')),
-                  const SizedBox(height: 10),
-                  TextField(
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Service Frequency (months) *', border: OutlineInputBorder(), hintText: 'e.g. 3')),
-                  const SizedBox(height: 10),
+                  // Red header
                   Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(color: const Color(0xFFbdbdbd)),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: DropdownButton<String>(
-                      value: selectedType,
-                      isExpanded: true,
-                      underline: const SizedBox(),
-                      hint: const Text('Select Type'),
-                      items: const [
-                        DropdownMenuItem(value: 'truck', child: Text('🚛 Truck')),
-                        DropdownMenuItem(value: 'car', child: Text('🚗 Car')),
-                      ],
-                      onChanged: (v) => setModal(() => selectedType = v!),
-                    ),
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+                    decoration: const BoxDecoration(color: _red, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+                    child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                      Container(width: 44, height: 44,
+                        decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(12)),
+                        child: Icon(isEdit ? Icons.edit_outlined : Icons.add, color: Colors.white, size: 22)),
+                      const SizedBox(width: 12),
+                      Expanded(child: Text(isEdit ? 'Edit Vehicle' : 'Add Vehicle',
+                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))),
+                      GestureDetector(onTap: () => Navigator.pop(context),
+                        child: const Icon(Icons.close, color: Colors.white)),
+                    ]),
                   ),
-                  const SizedBox(height: 20),
-                  Row(children: [
-                    Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel'))),
-                    const SizedBox(width: 12),
-                    Expanded(child: ElevatedButton(
-                      onPressed: () {
-                        if (plateCtrl.text.trim().isEmpty) return;
-                        setState(() {
-                          final newV = {
-                            'plate': plateCtrl.text.trim().toUpperCase(),
-                            'desc': descCtrl.text.trim(),
-                            'owner': ownerCtrl.text.trim(),
-                            'odo': '${odoCtrl.text.trim()} km',
-                            'type': selectedType,
-                            'status': selectedStatus,
-                          };
-                          if (isEdit) {
-                            final idx = _vehicles.indexWhere((e) => e['plate'] == vehicle!['plate']);
-                            if (idx != -1) _vehicles[idx] = newV;
-                          } else {
-                            _vehicles.add(newV);
-                          }
-                          _filtered = List.from(_vehicles);
-                        });
-                        Navigator.pop(context);
-                      },
-                      style: ElevatedButton.styleFrom(backgroundColor: _red, foregroundColor: Colors.white),
-                      child: Text(isEdit ? '💾 Update' : '💾 Save'),
-                    )),
-                  ]),
+                  Padding(
+                    padding: EdgeInsets.only(left: 20, right: 20, top: 20,
+                      bottom: MediaQuery.of(context).viewInsets.bottom + 24),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      TextField(controller: plateCtrl,
+                        textCapitalization: TextCapitalization.characters,
+                        decoration: const InputDecoration(labelText: 'Plate Number *', border: OutlineInputBorder(), hintText: 'e.g. ABC-1234')),
+                      const SizedBox(height: 10),
+                      TextField(controller: descCtrl,
+                        decoration: const InputDecoration(labelText: 'Description *', border: OutlineInputBorder(), hintText: 'e.g. Isuzu Truck NQR 2021')),
+                      const SizedBox(height: 10),
+                      TextField(controller: ownerCtrl,
+                        decoration: const InputDecoration(labelText: 'Owner *', border: OutlineInputBorder())),
+                      const SizedBox(height: 10),
+                      TextField(controller: odoCtrl, keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: 'Current Odometer (km) *', border: OutlineInputBorder(), suffixText: 'km')),
+                      const SizedBox(height: 10),
+                      TextField(
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: 'Last Service Odometer (km)', border: OutlineInputBorder(), suffixText: 'km')),
+                      const SizedBox(height: 10),
+                      TextField(
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: 'Service Frequency (months) *', border: OutlineInputBorder(), hintText: 'e.g. 3')),
+                      const SizedBox(height: 10),
+                      // Vehicle Type — from Firestore
+                      snap.connectionState == ConnectionState.waiting
+                        ? const TextField(decoration: InputDecoration(labelText: 'Vehicle Type', border: OutlineInputBorder(), hintText: 'Loading...'))
+                        : DropdownButtonFormField<String>(
+                            value: selectedType,
+                            isExpanded: true,
+                            decoration: const InputDecoration(labelText: 'Vehicle Type *', border: OutlineInputBorder()),
+                            hint: const Text('Select type'),
+                            items: types.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+                            onChanged: (v) => setModal(() => selectedType = v),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                      const SizedBox(height: 20),
+                      Row(children: [
+                        Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel'))),
+                        const SizedBox(width: 12),
+                        Expanded(child: ElevatedButton(
+                          onPressed: () {
+                            if (plateCtrl.text.trim().isEmpty) return;
+                            setState(() {
+                              final newV = {
+                                'plate': plateCtrl.text.trim().toUpperCase(),
+                                'desc': descCtrl.text.trim(),
+                                'owner': ownerCtrl.text.trim(),
+                                'odo': '${odoCtrl.text.trim()} km',
+                                'type': selectedType ?? '',
+                                'status': selectedStatus,
+                              };
+                              if (isEdit) {
+                                final idx = _vehicles.indexWhere((e) => e['plate'] == vehicle!['plate']);
+                                if (idx != -1) _vehicles[idx] = newV;
+                              } else {
+                                _vehicles.add(newV);
+                              }
+                              _filtered = List.from(_vehicles);
+                            });
+                            Navigator.pop(context);
+                          },
+                          style: ElevatedButton.styleFrom(backgroundColor: _red, foregroundColor: Colors.white),
+                          child: Text(isEdit ? '💾 Update' : '💾 Save'),
+                        )),
+                      ]),
+                    ]),
+                  ),
                 ]),
               ),
-            ]),
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }

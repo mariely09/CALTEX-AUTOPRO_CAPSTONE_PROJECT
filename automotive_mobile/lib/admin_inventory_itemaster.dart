@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:barcode_widget/barcode_widget.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 class AdminInventoryItemMaster extends StatefulWidget {
   const AdminInventoryItemMaster({super.key});
@@ -9,21 +12,26 @@ class AdminInventoryItemMaster extends StatefulWidget {
 
 class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
   static const _red = Color(0xFFE8001C);
+  static const _col = 'item_master';
 
-  final List<Map<String, String>> _items = [
-    {'num': 'ITM-001', 'name': 'Engine Oil 10W-40', 'group': 'Lubricants', 'uom': 'L', 'cost': '₱450', 'type': 'Material'},
-    {'num': 'ITM-002', 'name': 'Oil Filter', 'group': 'Filters', 'uom': 'pcs', 'cost': '₱180', 'type': 'Material'},
-    {'num': 'ITM-003', 'name': 'Brake Pads', 'group': 'Brakes', 'uom': 'set', 'cost': '₱1,200', 'type': 'Material'},
-    {'num': 'ITM-004', 'name': 'Oil Change Service', 'group': 'Labor', 'uom': 'job', 'cost': '₱500', 'type': 'Service'},
-  ];
-
-  List<Map<String, String>> _filtered = [];
   final _searchCtrl = TextEditingController();
+  bool _searching = false;
+  String _searchQuery = '';
 
-  @override
-  void initState() {
-    super.initState();
-    _filtered = List.from(_items);
+  CollectionReference get _db => FirebaseFirestore.instance.collection(_col);
+
+  // Cache domains so they're only fetched once
+  List<String>? _cachedGroups;
+  List<String>? _cachedUoms;
+
+  Future<void> _ensureDomainsLoaded() async {
+    if (_cachedGroups != null && _cachedUoms != null) return;
+    final results = await Future.wait([
+      _fetchDomain('commodity_groups'),
+      _fetchDomain('uom'),
+    ]);
+    _cachedGroups = results[0];
+    _cachedUoms = results[1];
   }
 
   @override
@@ -32,17 +40,20 @@ class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
     super.dispose();
   }
 
-  void _onSearch(String query) {
-    setState(() {
-      _filtered = _items.where((item) =>
-        item['name']!.toLowerCase().contains(query.toLowerCase()) ||
-        item['num']!.toLowerCase().contains(query.toLowerCase()) ||
-        item['group']!.toLowerCase().contains(query.toLowerCase())
-      ).toList();
-    });
+  Future<List<String>> _fetchDomain(String key) async {
+    final snap = await FirebaseFirestore.instance
+        .collection('domains').doc(key).collection('items')
+        .orderBy('name').get();
+    return snap.docs.map((d) => d['name'] as String).toList();
   }
 
-  bool _searching = false;
+  Future<String> _nextItemNum() async {
+    final snap = await _db.orderBy('createdAt', descending: true).limit(1).get();
+    if (snap.docs.isEmpty) return 'ITM-001';
+    final last = snap.docs.first['num'] as String? ?? 'ITM-000';
+    final n = int.tryParse(last.replaceAll('ITM-', '')) ?? 0;
+    return 'ITM-${(n + 1).toString().padLeft(3, '0')}';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,7 +72,7 @@ class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
             ? TextField(
                 controller: _searchCtrl,
                 autofocus: true,
-                onChanged: _onSearch,
+                onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
                 style: const TextStyle(color: Colors.white),
                 decoration: const InputDecoration(
                   hintText: 'Search items...',
@@ -74,42 +85,76 @@ class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
         actions: [
           IconButton(
             icon: Icon(_searching ? Icons.close : Icons.search, color: Colors.white),
-            onPressed: () {
-              setState(() {
-                _searching = !_searching;
-                if (!_searching) {
-                  _searchCtrl.clear();
-                  _filtered = List.from(_items);
-                }
-              });
-            },
+            onPressed: () => setState(() {
+              _searching = !_searching;
+              if (!_searching) { _searchCtrl.clear(); _searchQuery = ''; }
+            }),
           ),
         ],
       ),
-      body: Column(children: [
-        // Stats row
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: Row(children: [
-            _statChip('Total Items', '${_items.length}', Colors.blue),
-            const SizedBox(width: 8),
-            _statChip('Materials', '${_items.where((i) => i['type'] == 'Material').length}', _red),
-            const SizedBox(width: 8),
-            _statChip('Services', '${_items.where((i) => i['type'] == 'Service').length}', const Color(0xFF003087)),
-          ]),
-        ),
-        // List
-        Expanded(
-          child: _filtered.isEmpty
-            ? const Center(child: Text('No items found.', style: TextStyle(color: Color(0xFF718096))))
-            : ListView.separated(
-                padding: const EdgeInsets.all(16),
-                itemCount: _filtered.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (_, i) => _itemCard(_filtered[i]),
-              ),
-        ),
-      ]),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: _db.orderBy('createdAt', descending: false).snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+
+          final docs = snapshot.data?.docs ?? [];
+          final items = docs.map((d) {
+            final data = d.data() as Map<String, dynamic>;
+            return {
+              'id': d.id,
+              'num': data['num'] as String? ?? '—',
+              'sku': data['sku'] as String? ?? '',
+              'name': data['name'] as String? ?? '—',
+              'desc': data['desc'] as String? ?? '',
+              'group': data['group'] as String? ?? '',
+              'uom': data['uom'] as String? ?? '',
+              'cost': data['cost'] as String? ?? '₱0',
+              'type': data['type'] as String? ?? 'Material',
+              'barcode': data['barcode'] as String? ?? '',
+              'qr': data['qr'] as String? ?? '',
+            };
+          }).toList();
+
+          final filtered = _searchQuery.isEmpty
+              ? items
+              : items.where((i) =>
+                  i['name']!.toLowerCase().contains(_searchQuery) ||
+                  i['num']!.toLowerCase().contains(_searchQuery) ||
+                  i['group']!.toLowerCase().contains(_searchQuery)).toList();
+
+          final total = items.length;
+          final materials = items.where((i) => i['type'] == 'Material').length;
+          final services = items.where((i) => i['type'] == 'Service').length;
+
+          return Column(children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: Row(children: [
+                _statChip('Total Items', '$total', Colors.blue),
+                const SizedBox(width: 8),
+                _statChip('Materials', '$materials', _red),
+                const SizedBox(width: 8),
+                _statChip('Services', '$services', const Color(0xFF003087)),
+              ]),
+            ),
+            Expanded(
+              child: filtered.isEmpty
+                ? const Center(child: Text('No items found.', style: TextStyle(color: Color(0xFF718096))))
+                : ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (_, i) => _itemCard(filtered[i]),
+                  ),
+            ),
+          ]);
+        },
+      ),
     );
   }
 
@@ -176,15 +221,13 @@ class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
   void _showItemDetails(Map<String, String> item) {
     final isSvc = item['type'] == 'Service';
     showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
+      context: context, isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => DraggableScrollableSheet(
         expand: false, initialChildSize: 0.6, maxChildSize: 0.9,
         builder: (_, ctrl) => SingleChildScrollView(
           controller: ctrl,
           child: Column(children: [
-            // Hero header
             Container(
               width: double.infinity,
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
@@ -192,22 +235,19 @@ class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
                 color: isSvc ? const Color(0xFF003087) : _red,
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-                  Container(width: 48, height: 48,
-                    decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(12)),
-                    child: Icon(isSvc ? Icons.build_outlined : Icons.inventory_2_outlined, color: Colors.white, size: 24)),
-                  const SizedBox(width: 12),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(item['name']!, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                    Text(item['group'] ?? '—', style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                  ])),
-                  GestureDetector(onTap: () => Navigator.pop(context),
-                    child: const Icon(Icons.close, color: Colors.white)),
-                ]),
+              child: Row(children: [
+                Container(width: 48, height: 48,
+                  decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(12)),
+                  child: Icon(isSvc ? Icons.build_outlined : Icons.inventory_2_outlined, color: Colors.white, size: 24)),
+                const SizedBox(width: 12),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(item['name']!, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  Text(item['group'] ?? '—', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                ])),
+                GestureDetector(onTap: () => Navigator.pop(context),
+                  child: const Icon(Icons.close, color: Colors.white)),
               ]),
             ),
-            // Details
             Padding(
               padding: const EdgeInsets.all(20),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -222,19 +262,49 @@ class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
                 if (!isSvc) ...[
                   const Divider(height: 24),
                   const Text('Scan Codes', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF718096))),
-                  const SizedBox(height: 8),
-                  _detailRow('Barcode', item['barcode']?.isNotEmpty == true ? item['barcode']! : '—'),
-                  _detailRow('QR Code', item['qr']?.isNotEmpty == true ? item['qr']! : '—'),
+                  const SizedBox(height: 12),
+                  if ((item['barcode'] ?? '').isNotEmpty) ...[
+                    const Text('Barcode', style: TextStyle(fontSize: 11, color: Color(0xFF718096))),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(color: Colors.white, border: Border.all(color: const Color(0xFFe2e8f0)), borderRadius: BorderRadius.circular(10)),
+                      child: BarcodeWidget(
+                        barcode: Barcode.code128(),
+                        data: item['barcode']!,
+                        width: double.infinity,
+                        height: 70,
+                        drawText: true,
+                        style: const TextStyle(fontSize: 10),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  if ((item['qr'] ?? '').isNotEmpty) ...[
+                    const Text('QR Code', style: TextStyle(fontSize: 11, color: Color(0xFF718096))),
+                    const SizedBox(height: 8),
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(color: Colors.white, border: Border.all(color: const Color(0xFFe2e8f0)), borderRadius: BorderRadius.circular(10)),
+                        child: QrImageView(
+                          data: item['qr']!,
+                          version: QrVersions.auto,
+                          size: 160,
+                        ),
+                      ),
+                    ),
+                  ],
+                  if ((item['barcode'] ?? '').isEmpty && (item['qr'] ?? '').isEmpty)
+                    const Text('No scan codes assigned.', style: TextStyle(fontSize: 12, color: Color(0xFF718096))),
                 ],
                 const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
+                SizedBox(width: double.infinity,
                   child: OutlinedButton.icon(
                     onPressed: () { Navigator.pop(context); _showAddItemModal(item: item); },
                     icon: const Icon(Icons.edit_outlined, size: 16),
                     label: const Text('Edit'),
-                  ),
-                ),
+                  )),
               ]),
             ),
           ]),
@@ -253,181 +323,164 @@ class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
     );
   }
 
-  void _showAddItemModal({Map<String, String>? item}) {
+  void _showAddItemModal({Map<String, String>? item}) async {
     final isEdit = item != null;
-    final numCtrl = TextEditingController(text: item?['num'] ?? 'ITM-${(_items.length + 1).toString().padLeft(3, '0')}');
+
+    // Load domains once (cached after first load)
+    await _ensureDomainsLoaded();
+    if (!mounted) return;
+
+    final groups = _cachedGroups!;
+    final uoms = _cachedUoms!;
+    final itemNum = isEdit ? item!['num']! : await _nextItemNum();
+    if (!mounted) return;
+
     final skuCtrl = TextEditingController(text: item?['sku'] ?? '');
     final nameCtrl = TextEditingController(text: item?['name'] ?? '');
     final descCtrl = TextEditingController(text: item?['desc'] ?? '');
-    final groupCtrl = TextEditingController(text: item?['group'] ?? '');
-    final uomCtrl = TextEditingController(text: item?['uom'] ?? '');
     final costCtrl = TextEditingController(text: item?['cost']?.replaceAll('₱', '').replaceAll(',', '') ?? '');
     final barcodeCtrl = TextEditingController(text: item?['barcode'] ?? '');
     final qrCtrl = TextEditingController(text: item?['qr'] ?? '');
     String selectedType = item?['type'] ?? 'Material';
+    String? selectedGroup = (item?['group']?.isNotEmpty == true && groups.contains(item!['group'])) ? item['group'] : null;
+    String? selectedUom = (item?['uom']?.isNotEmpty == true && uoms.contains(item!['uom'])) ? item['uom'] : null;
 
     showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
+      context: context, isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => StatefulBuilder(
-        builder: (ctx, setModalState) {
-          return DraggableScrollableSheet(
-            expand: false,
-            initialChildSize: 0.85,
-            maxChildSize: 0.95,
-            builder: (_, ctrl) {
-              return SingleChildScrollView(
-                controller: ctrl,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Red header
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-                      decoration: const BoxDecoration(
-                        color: _red,
-                        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                      ),
-                      child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-                        Container(width: 44, height: 44,
-                          decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(12)),
-                          child: Icon(isEdit ? Icons.edit_outlined : Icons.add, color: Colors.white, size: 22)),
-                        const SizedBox(width: 12),
-                        Expanded(child: Text(isEdit ? 'Edit Item' : 'Add Item',
-                          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))),
-                        GestureDetector(
-                          onTap: () => Navigator.pop(context),
-                          child: const Icon(Icons.close, color: Colors.white)),
-                      ]),
-                    ),
-                    // Form
-                    Padding(
-                      padding: EdgeInsets.only(left: 20, right: 20, top: 20,
-                        bottom: MediaQuery.of(context).viewInsets.bottom + 24),
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        TextField(
-                          controller: numCtrl,
-                          readOnly: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Item Number',
-                            border: OutlineInputBorder(),
-                            filled: true,
-                            fillColor: Color(0xFFF7F8FA),
-                            suffixIcon: Icon(Icons.lock_outline, size: 16, color: Color(0xFF718096)),
+        builder: (ctx, setModalState) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: SingleChildScrollView(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+                decoration: const BoxDecoration(color: _red,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+                child: Row(children: [
+                  Container(width: 44, height: 44,
+                    decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(12)),
+                    child: Icon(isEdit ? Icons.edit_outlined : Icons.add, color: Colors.white, size: 22)),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(isEdit ? 'Edit Item' : 'Add Item',
+                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))),
+                  GestureDetector(onTap: () => Navigator.pop(ctx),
+                    child: const Icon(Icons.close, color: Colors.white)),
+                ]),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  TextField(controller: skuCtrl, keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'SKU', border: OutlineInputBorder(), hintText: 'e.g. 10001')),
+                  const SizedBox(height: 10),
+                  TextField(controller: nameCtrl,
+                    decoration: const InputDecoration(labelText: 'Item Name *', border: OutlineInputBorder())),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    value: selectedGroup,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'Commodity Group', border: OutlineInputBorder()),
+                    hint: const Text('Select group'),
+                    items: groups.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+                    onChanged: (v) => setModalState(() => selectedGroup = v),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    value: selectedUom,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'UOM', border: OutlineInputBorder()),
+                    hint: const Text('Select UOM'),
+                    items: uoms.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+                    onChanged: (v) => setModalState(() => selectedUom = v),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(controller: descCtrl, maxLines: 2,
+                    decoration: const InputDecoration(labelText: 'Description', border: OutlineInputBorder())),
+                  const SizedBox(height: 10),
+                  Row(children: [
+                    Expanded(child: TextField(controller: costCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Cost (₱)', border: OutlineInputBorder(), prefixText: '₱'))),
+                    const SizedBox(width: 10),
+                    Expanded(child: DropdownButtonFormField<String>(
+                      value: selectedType,
+                      decoration: const InputDecoration(labelText: 'Type', border: OutlineInputBorder()),
+                      items: const [
+                        DropdownMenuItem(value: 'Material', child: Text('Material')),
+                        DropdownMenuItem(value: 'Service', child: Text('Service')),
+                      ],
+                      onChanged: (v) => setModalState(() => selectedType = v!),
+                    )),
+                  ]),
+                  if (selectedType == 'Material') ...[
+                    const SizedBox(height: 10),
+                    Row(children: [
+                      Expanded(child: TextField(controller: barcodeCtrl,
+                        decoration: InputDecoration(
+                          labelText: 'Barcode', border: const OutlineInputBorder(),
+                          suffixIcon: IconButton(
+                            icon: const Icon(Icons.auto_fix_high, size: 18),
+                            onPressed: () { barcodeCtrl.text = DateTime.now().millisecondsSinceEpoch.toString().substring(3); setModalState(() {}); },
                           ),
-                        ),
-                        const SizedBox(height: 10),
-                        TextField(controller: nameCtrl,
-                          decoration: const InputDecoration(labelText: 'Item Name *', border: OutlineInputBorder())),
-                        const SizedBox(height: 10),
-                        TextField(controller: skuCtrl,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(labelText: 'SKU', border: OutlineInputBorder(), hintText: 'e.g. 10001')),
-                        const SizedBox(height: 10),
-                        TextField(controller: descCtrl, maxLines: 2,
-                          decoration: const InputDecoration(labelText: 'Description', border: OutlineInputBorder(), hintText: 'Detailed description...')),
-                        const SizedBox(height: 10),
-                        Row(children: [
-                          Expanded(child: TextField(controller: groupCtrl,
-                            decoration: const InputDecoration(labelText: 'Commodity Group', border: OutlineInputBorder()))),
-                          const SizedBox(width: 10),
-                          Expanded(child: TextField(controller: uomCtrl,
-                            decoration: const InputDecoration(labelText: 'UOM', border: OutlineInputBorder()))),
-                        ]),
-                        const SizedBox(height: 10),
-                        Row(children: [
-                          Expanded(child: TextField(controller: costCtrl,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(labelText: 'Cost (₱)', border: OutlineInputBorder(), prefixText: '₱'))),
-                          const SizedBox(width: 10),
-                          Expanded(child: DropdownButtonFormField<String>(
-                            value: selectedType,
-                            decoration: const InputDecoration(labelText: 'Type', border: OutlineInputBorder()),
-                            items: const [
-                              DropdownMenuItem(value: 'Material', child: Text('Material')),
-                              DropdownMenuItem(value: 'Service', child: Text('Service')),
-                            ],
-                            onChanged: (v) => setModalState(() => selectedType = v!),
-                          )),
-                        ]),
-                        if (selectedType == 'Material') ...[
-                          const SizedBox(height: 10),
-                          Row(children: [
-                            Expanded(child: TextField(controller: barcodeCtrl,
-                              decoration: InputDecoration(
-                                labelText: 'Barcode',
-                                border: const OutlineInputBorder(),
-                                hintText: 'e.g. 1234567890',
-                                suffixIcon: IconButton(
-                                  icon: const Icon(Icons.auto_fix_high, size: 18),
-                                  onPressed: () {
-                                    barcodeCtrl.text = DateTime.now().millisecondsSinceEpoch.toString().substring(3);
-                                    setModalState(() {});
-                                  },
-                                ),
-                              ))),
-                            const SizedBox(width: 10),
-                            Expanded(child: TextField(controller: qrCtrl,
-                              decoration: InputDecoration(
-                                labelText: 'QR Code',
-                                border: const OutlineInputBorder(),
-                                hintText: 'e.g. QR-ITM-001',
-                                suffixIcon: IconButton(
-                                  icon: const Icon(Icons.auto_fix_high, size: 18),
-                                  onPressed: () {
-                                    qrCtrl.text = 'QR-${numCtrl.text}';
-                                    setModalState(() {});
-                                  },
-                                ),
-                              ))),
-                          ]),
-                        ],
-                        const SizedBox(height: 20),
-                        Row(children: [
-                          Expanded(child: OutlinedButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Cancel'))),
-                          const SizedBox(width: 12),
-                          Expanded(child: ElevatedButton(
-                            onPressed: () {
-                              if (nameCtrl.text.trim().isEmpty) return;
-                              setState(() {
-                                final newItem = {
-                                  'num': numCtrl.text,
-                                  'sku': skuCtrl.text.trim(),
-                                  'name': nameCtrl.text.trim(),
-                                  'desc': descCtrl.text.trim(),
-                                  'group': groupCtrl.text.trim(),
-                                  'uom': uomCtrl.text.trim(),
-                                  'cost': '₱${costCtrl.text.trim()}',
-                                  'type': selectedType,
-                                  'barcode': selectedType == 'Material' ? barcodeCtrl.text.trim() : '',
-                                  'qr': selectedType == 'Material' ? qrCtrl.text.trim() : '',
-                                };
-                                if (isEdit) {
-                                  final idx = _items.indexWhere((e) => e['num'] == item!['num']);
-                                  if (idx != -1) _items[idx] = newItem;
-                                } else {
-                                  _items.add(newItem);
-                                }
-                                _filtered = List.from(_items);
-                              });
-                              Navigator.pop(context);
-                            },
-                            style: ElevatedButton.styleFrom(backgroundColor: _red, foregroundColor: Colors.white),
-                            child: Text(isEdit ? '💾 Update' : '💾 Save'),
-                          )),
-                        ]),
-                      ]),
-                    ),
+                        ))),
+                      const SizedBox(width: 10),
+                      Expanded(child: TextField(controller: qrCtrl,
+                        decoration: InputDecoration(
+                          labelText: 'QR Code', border: const OutlineInputBorder(),
+                          suffixIcon: IconButton(
+                            icon: const Icon(Icons.auto_fix_high, size: 18),
+                            onPressed: () { qrCtrl.text = 'QR-$itemNum'; setModalState(() {}); },
+                          ),
+                        ))),
+                    ]),
                   ],
-                ),
-              );
-            },
-          );
-        },
+                  const SizedBox(height: 20),
+                  Row(children: [
+                    Expanded(child: OutlinedButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Cancel'))),
+                    const SizedBox(width: 12),
+                    Expanded(child: ElevatedButton(
+                      onPressed: () async {
+                        if (nameCtrl.text.trim().isEmpty) return;
+                        final data = <String, dynamic>{
+                          'num': itemNum,
+                          'sku': skuCtrl.text.trim(),
+                          'name': nameCtrl.text.trim(),
+                          'desc': descCtrl.text.trim(),
+                          'group': selectedGroup ?? '',
+                          'uom': selectedUom ?? '',
+                          'cost': '₱${costCtrl.text.trim()}',
+                          'type': selectedType,
+                          'barcode': selectedType == 'Material' ? barcodeCtrl.text.trim() : '',
+                          'qr': selectedType == 'Material' ? qrCtrl.text.trim() : '',
+                        };
+                        try {
+                          if (isEdit) {
+                            await _db.doc(item!['id']).update(data);
+                          } else {
+                            data['createdAt'] = FieldValue.serverTimestamp();
+                            await _db.add(data);
+                          }
+                          if (ctx.mounted) Navigator.pop(ctx);
+                        } catch (e) {
+                          if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(
+                            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(backgroundColor: _red, foregroundColor: Colors.white),
+                      child: Text(isEdit ? '💾 Update' : '💾 Save'),
+                    )),
+                  ]),
+                ]),
+              ),
+            ]),
+          ),
+        ),
       ),
     );
   }
@@ -437,16 +490,18 @@ class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Delete Item'),
-        content: Text('Are you sure you want to delete "${item['name']}"?'),
+        content: Text('Delete "${item['name']}"?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           TextButton(
-            onPressed: () {
-              setState(() {
-                _items.removeWhere((e) => e['num'] == item['num']);
-                _filtered = List.from(_items);
-              });
+            onPressed: () async {
               Navigator.pop(context);
+              try {
+                await _db.doc(item['id']).delete();
+              } catch (e) {
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+              }
             },
             child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),
