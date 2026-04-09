@@ -1,0 +1,91 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JA Noble Enterprise INC - Automotive Service</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- App Header -->
+        <div class="app-header">
+            <div class="app-logo"><img src="img/logo_caltex.png" alt="Logo" style="width:100%;height:100%;object-fit:contain;mix-blend-mode:multiply;"></div>
+            <div class="app-title">JA Noble Enterprise INC</div>
+            <div class="app-subtitle">Automotive Service</div>
+        </div>
+
+        <!-- Login Screen -->
+        <div class="login-screen" id="loginScreen">
+            <div class="login-tabs">
+                <button class="login-tab active" id="customerTab">Customer</button>
+                <button class="login-tab" id="staffTab">Staff</button>
+                <button class="login-tab" id="adminTab">Admin</button>
+            </div>
+
+            <!-- Customer Login -->
+            <div class="login-form-container active" id="customerLogin">
+                <h2 style="text-align:center;margin-bottom:1.5rem;color:#1a202c;">Customer Portal</h2>
+                <form id="customerLoginForm">
+                    <div class="form-group">
+                        <label for="customerUsername">Username</label>
+                        <input type="text" id="customerUsername" placeholder="Enter your username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="customerPassword">Password</label>
+                        <input type="password" id="customerPassword" placeholder="Enter your password" required>
+                    </div>
+                    <button type="submit" class="login-btn">Login</button>
+                </form>
+                <div style="margin-top:1.5rem;text-align:center;font-size:0.85rem;color:#718096;">
+                    <p><strong style="color:#4a5568;">Demo Account:</strong></p>
+                    <p>Username: customer | Password: customer123</p>
+                </div>
+            </div>
+
+            <!-- Staff Login -->
+            <div class="login-form-container" id="staffLogin">
+                <h2 style="text-align:center;margin-bottom:1.5rem;color:#1a202c;">Staff Portal</h2>
+                <form id="staffLoginForm">
+                    <div class="form-group">
+                        <label for="staffUsername">Username</label>
+                        <input type="text" id="staffUsername" placeholder="Enter your username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="staffPassword">Password</label>
+                        <input type="password" id="staffPassword" placeholder="Enter your password" required>
+                    </div>
+                    <button type="submit" class="login-btn">Login</button>
+                </form>
+                <div style="margin-top:1.5rem;text-align:center;font-size:0.85rem;color:#718096;">
+                    <p><strong style="color:#4a5568;">Demo Account:</strong></p>
+                    <p>Username: staff | Password: staff123</p>
+                </div>
+            </div>
+
+            <!-- Admin Login -->
+            <div class="login-form-container" id="adminLogin">
+                <h2 style="text-align:center;margin-bottom:1.5rem;color:#1a202c;">Admin Portal</h2>
+                <form id="adminLoginForm">
+                    <div class="form-group">
+                        <label for="adminUsername">Username</label>
+                        <input type="text" id="adminUsername" placeholder="Enter admin username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="adminPassword">Password</label>
+                        <input type="password" id="adminPassword" placeholder="Enter admin password" required>
+                    </div>
+                    <button type="submit" class="login-btn">Login to Admin Panel</button>
+                </form>
+                <div style="margin-top:1.5rem;text-align:center;font-size:0.85rem;color:#718096;">
+                    <p><strong style="color:#4a5568;">Demo Admin:</strong></p>
+                    <p>Username: admin | Password: admin123</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="login.js"></script>
+</body>
+</html>

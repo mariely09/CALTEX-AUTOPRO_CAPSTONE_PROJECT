@@ -1,0 +1,448 @@
+/* ── Admin Notifications Panel ───────────────────────────── */
+.admin-notif-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85rem;
+    padding: 0.9rem 1.25rem;
+    border-bottom: 1px solid #f0f4f8;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.admin-notif-item:last-child { border-bottom: none; }
+.admin-notif-item:hover { background: #f8fafc; }
+.admin-notif-item.unread { background: #fff8f8; border-left: 3px solid #E31E24; }
+
+.admin-notif-icon {
+    font-size: 1.3rem;
+    flex-shrink: 0;
+    margin-top: 0.1rem;
+}
+
+.admin-notif-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #1a202c;
+    margin-bottom: 0.2rem;
+}
+
+.admin-notif-msg {
+    font-size: 0.78rem;
+    color: #4a5568;
+    line-height: 1.5;
+}
+
+.admin-notif-time {
+    font-size: 0.7rem;
+    color: #a0aec0;
+    margin-top: 0.25rem;
+}
+
+.admin-notif-empty {
+    text-align: center;
+    padding: 2.5rem 1rem;
+    color: #a0aec0;
+}
+
+.admin-notif-empty-icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+.admin-notif-empty-text { font-size: 0.88rem; font-weight: 600; }
+
+/* ── DSS — Stock Replenishment ───────────────────────────── */
+.dss-hero {
+    background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+    border-radius: 16px;
+    padding: 1.5rem 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+
+.dss-hero-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.dss-hero-icon {
+    font-size: 2.2rem;
+    background: rgba(255,255,255,0.1);
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.dss-hero-title {
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: white;
+}
+
+.dss-hero-sub {
+    font-size: 0.82rem;
+    color: rgba(255,255,255,0.6);
+    margin-top: 0.2rem;
+}
+
+.dss-refresh-btn {
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: white;
+    padding: 0.6rem 1.2rem;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-family: inherit;
+}
+.dss-refresh-btn:hover { background: rgba(255,255,255,0.2); }
+
+/* KPI Grid */
+.dss-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr) 1.4fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.dss-kpi-card {
+    background: white;
+    border-radius: 14px;
+    padding: 1.1rem 1.25rem;
+    border: 1.5px solid #e2e8f0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.dss-kpi-card.wide { grid-column: span 1; }
+
+.dss-kpi-icon { font-size: 1.4rem; }
+
+.dss-kpi-val {
+    font-size: 1.75rem;
+    font-weight: 900;
+    line-height: 1;
+}
+
+.dss-kpi-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #718096;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+/* Filter bar */
+.dss-filter-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.dss-filter-group {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.dss-filter-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #718096;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    white-space: nowrap;
+}
+
+.dss-filter-pills {
+    display: flex;
+    gap: 0.4rem;
+}
+
+.dss-pill {
+    padding: 0.35rem 0.9rem;
+    border-radius: 20px;
+    border: 1.5px solid #e2e8f0;
+    background: white;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    color: #4a5568;
+    transition: all 0.15s;
+}
+.dss-pill.active        { background: #1a202c; color: white; border-color: #1a202c; }
+.dss-pill.critical.active { background: #e53e3e; border-color: #e53e3e; }
+.dss-pill.warning.active  { background: #d69e2e; border-color: #d69e2e; }
+.dss-pill.ok.active       { background: #38a169; border-color: #38a169; }
+
+.dss-search {
+    padding: 0.55rem 1rem;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 0.88rem;
+    font-family: inherit;
+    outline: none;
+    width: 240px;
+    transition: border-color 0.2s;
+}
+.dss-search:focus { border-color: #E31E24; }
+
+/* Table */
+.dss-table-wrap {
+    background: white;
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+}
+
+.dss-table-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e2e8f0;
+    background: #f8fafc;
+    font-weight: 700;
+    font-size: 0.92rem;
+    color: #1a202c;
+}
+
+.dss-export-btn {
+    background: white;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 0.4rem 0.9rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    color: #4a5568;
+    transition: all 0.15s;
+}
+.dss-export-btn:hover { background: #f0fff4; border-color: #9ae6b4; color: #276749; }
+
+/* Table — proper <table> layout */
+.dss-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+}
+
+.dss-table thead tr {
+    background: #f7fafc;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.dss-table thead th {
+    padding: 0.75rem 1.1rem;
+    text-align: left;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #718096;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+.dss-tr {
+    border-bottom: 1px solid #f0f4f8;
+    transition: background 0.15s;
+}
+.dss-tr:last-child { border-bottom: none; }
+.dss-tr:hover { background: #fafbfc; }
+
+.dss-td {
+    padding: 0.9rem 1.1rem;
+    vertical-align: middle;
+}
+
+.dss-item-name {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #1a202c;
+    margin-bottom: 0.2rem;
+}
+
+.dss-item-sub {
+    font-size: 0.72rem;
+    color: #a0aec0;
+    font-weight: 500;
+}
+
+.dss-stock-nums {
+    font-size: 0.88rem;
+    margin-bottom: 0.35rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.25rem;
+}
+
+.dss-stock-sep { color: #cbd5e0; font-size: 0.8rem; }
+.dss-stock-max { font-size: 0.78rem; color: #718096; }
+
+.dss-bar-track {
+    width: 100%;
+    height: 5px;
+    background: #e2e8f0;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 0.3rem;
+}
+
+.dss-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.4s ease;
+}
+
+.dss-stock-hint {
+    font-size: 0.68rem;
+    color: #a0aec0;
+}
+
+.dss-rate {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #1a202c;
+    margin-bottom: 0.2rem;
+}
+
+.dss-days {
+    font-size: 1rem;
+    font-weight: 800;
+    margin-bottom: 0.2rem;
+}
+
+.dss-order-qty {
+    font-size: 1rem;
+    font-weight: 800;
+    color: #1a202c;
+    margin-bottom: 0.2rem;
+}
+
+.dss-priority-badge {
+    display: inline-block;
+    padding: 0.25rem 0.7rem;
+    border-radius: 20px;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.4px;
+    white-space: nowrap;
+}
+
+.dss-decision {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #4a5568;
+    line-height: 1.4;
+}
+
+.dss-empty {
+    text-align: center;
+    padding: 2.5rem;
+    color: #a0aec0;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+/* Insights */
+.dss-insights-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem;
+}
+
+.dss-insight-card {
+    background: white;
+    border-radius: 14px;
+    padding: 1.25rem 1.5rem;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.dss-insight-title {
+    font-size: 0.82rem;
+    font-weight: 800;
+    color: #1a202c;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 1rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 2px solid #f0f4f8;
+}
+
+.dss-insight-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #f7fafc;
+}
+.dss-insight-row:last-child { border-bottom: none; }
+
+.dss-insight-rank {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #f0f4f8;
+    color: #718096;
+    font-size: 0.7rem;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.dss-priority-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.dss-insight-name {
+    flex: 1;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #1a202c;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dss-insight-val {
+    font-size: 0.82rem;
+    font-weight: 800;
+    color: #4a5568;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.dss-insight-empty {
+    font-size: 0.82rem;
+    color: #a0aec0;
+    padding: 0.5rem 0;
+}
+
+/* ── Caltex Blue override for Receive Items button ── */
+.btn-success {
+    background: linear-gradient(135deg, #003087 0%, #00205b 100%) !important;
+    box-shadow: 0 2px 8px rgba(0, 48, 135, 0.3) !important;
+}
+.btn-success:hover {
+    box-shadow: 0 4px 12px rgba(0, 48, 135, 0.45) !important;
+}

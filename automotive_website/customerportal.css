@@ -1,0 +1,17 @@
+/* Customer Portal — overrides */
+
+.portal-body {
+    background: #f0f4f8;
+    min-height: 100vh;
+    display: block;
+    padding: 0;
+    align-items: unset;
+    justify-content: unset;
+}
+
+.portal-body .admin-dashboard {
+    display: flex !important;
+    position: static;
+    min-height: 100vh;
+    height: 100vh;
+}

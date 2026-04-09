@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JA Noble Enterprise - Staff Portal</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="staff.css">
+</head>
+<body class="portal-body">
+
+    <div class="admin-dashboard" id="staffDashboard" style="display:flex;">
+        <div class="admin-sidebar">
+            <div class="admin-sidebar-header">
+                <div class="admin-logo"><img src="img/logo_caltex.png" alt="Logo" style="width:100%;height:100%;object-fit:contain;"></div>
+                <div class="admin-title">JA Noble Enterprise</div>
+                <div class="admin-subtitle">Staff Portal</div>
+            </div>
+
+            <div class="admin-nav">
+                <button class="admin-nav-btn active" data-section="staff-overview">
+                    <span class="admin-nav-icon">📊</span>
+                    Dashboard
+                </button>
+                <button class="admin-nav-btn" data-section="staff-item-master" onclick="toggleStaffInventorySubmenu(event)">
+                    <span class="admin-nav-icon">📦</span>
+                    Inventory Management
+                    <span style="margin-left:auto;" id="staffInvArrow">▼</span>
+                </button>
+                <div class="admin-submenu" id="staffInventorySubmenu" style="display:none;">
+                    <button class="admin-nav-btn submenu-item" data-section="staff-inventory">
+                        <span class="admin-nav-icon">📦</span>
+                        Stock Inventory
+                    </button>
+                    <button class="admin-nav-btn submenu-item" data-section="staff-inv-transactions">
+                        <span class="admin-nav-icon">🔄</span>
+                        Inventory Transactions
+                    </button>
+                </div>
+                <button class="admin-nav-btn" data-section="staff-assets" onclick="toggleStaffAssetSubmenu(event)">
+                    <span class="admin-nav-icon">🚗</span>
+                    Asset Management
+                    <span style="margin-left:auto;" id="staffAssetArrow">▼</span>
+                </button>
+                <div class="admin-submenu" id="staffAssetSubmenu" style="display:none;">
+                    <button class="admin-nav-btn submenu-item" data-section="staff-asset-servicing">
+                        <span class="admin-nav-icon">🔧</span>
+                        Asset Maintenance
+                    </button>
+                    <button class="admin-nav-btn submenu-item" data-section="staff-issuance">
+                        <span class="admin-nav-icon">📦</span>
+                        Asset Issuance
+                    </button>
+                </div>
+            </div>
+
+            <div class="admin-sidebar-footer">
+                <div class="admin-user-info">
+                    <div class="admin-user-avatar" id="staffAvatar" style="background:#38a169;">ST</div>
+                    <div>
+                        <div style="font-weight:bold;margin-bottom:0.2rem;" id="staffName">Staff Member</div>
+                        <div style="font-size:0.8rem;color:#a0aec0;">Service Staff</div>
+                    </div>
+                </div>
+                <button class="logout-btn" id="staffLogoutBtn">
+                    <span>🚪</span> Logout
+                </button>
+            </div>
+        </div>
+
+        <div class="admin-main">
+            <div class="admin-header">
+                <div>
+                    <div class="breadcrumb">Staff Portal</div>
+                    <div class="admin-header-title" id="staffSectionTitle">Dashboard</div>
+                </div>
+                <div class="admin-header-actions">
+                    <button class="btn-icon btn-secondary">
+                        <span>🔔</span> Notifications
+                    </button>
+                </div>
+            </div>
+
+            <div class="admin-content">
+                <!-- Staff Overview Section -->
+                <div class="admin-section active" id="staff-overview">
+                    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:2rem;">
+                        <div class="stat-card">
+                            <div class="stat-icon orange">📋</div>
+                            <div class="stat-number">5</div>
+                            <div class="stat-label">Today's Services</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon blue">🚗</div>
+                            <div class="stat-number">2</div>
+                            <div class="stat-label">In Service Now</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon red">⚠️</div>
+                            <div class="stat-number">3</div>
+                            <div class="stat-label">Low Stock Items</div>
+                        </div>
+                    </div>
+
+                    <div class="data-table">
+                        <div class="table-header"><span>Today's Service Schedule</span></div>
+                        <div class="table-row" style="background:#f7fafc;font-weight:bold;border-bottom:2px solid #e2e8f0;">
+                            <div>Plate Number</div>
+                            <div>Asset Type</div>
+                            <div>Owner</div>
+                            <div>Service Type</div>
+                            <div>Date</div>
+                            <div>Status</div>
+                        </div>
+                        <div class="table-row">
+                            <div><strong>ABC-1234</strong></div>
+                            <div>🚛 Truck</div>
+                            <div>John Doe</div>
+                            <div>Change Oil</div>
+                            <div>Mar 22, 2026</div>
+                            <div><span class="status-badge status-pending">Pending</span></div>
+                        </div>
+                        <div class="table-row">
+                            <div><strong>XYZ-5678</strong></div>
+                            <div>� Truck</div>
+                            <div>John Doe</div>
+                            <div>Brake Inspection</div>
+                            <div>Mar 22, 2026</div>
+                            <div><span class="status-badge status-active">Ongoing</span></div>
+                        </div>
+                        <div class="table-row">
+                            <div><strong>DEF-9012</strong></div>
+                            <div>� Car</div>
+                            <div>John Doe</div>
+                            <div>PMS</div>
+                            <div>Mar 22, 2026</div>
+                            <div><span class="status-badge status-completed">Completed</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Staff Inventory Section -->
+                <div class="admin-section" id="staff-inventory">
+                    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:2rem;">
+                        <div class="stat-card">
+                            <div class="stat-icon blue">📦</div>
+                            <div class="stat-number" id="staffTotalInventoryItems">0</div>
+                            <div class="stat-label">Total Items</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon red">⚠️</div>
+                            <div class="stat-number" id="staffLowStockCount">0</div>
+                            <div class="stat-label">Low Stock Items</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon green">✅</div>
+                            <div class="stat-number" id="staffInStockCount">0</div>
+                            <div class="stat-label">In Stock Items</div>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom:2rem;">
+                        <button class="btn-success" style="padding:1rem 1.5rem;font-size:0.95rem;" onclick="openStaffReceiveDeliveryModal()">
+                            <span style="font-size:1.3rem;">📥</span> Receive Items
+                        </button>
+                    </div>
+
+                    <div class="data-table">
+                        <div class="table-header">
+                            <span>Parts Inventory</span>
+                            <div class="table-actions">
+                                <input type="text" class="search-bar" placeholder="Search parts..." id="staffInventorySearchBar" style="width:250px;" oninput="renderStaffInventoryFull()">
+                            </div>
+                        </div>
+                        <div class="table-row" style="background:#f7fafc;font-weight:bold;border-bottom:2px solid #e2e8f0;grid-template-columns:100px 1.5fr 1fr 100px 90px 90px 110px 80px;">
+                            <div>Item No.</div>
+                            <div>Item Name</div>
+                            <div>Commodity Group</div>
+                            <div>Current Qty</div>
+                            <div>Min Level</div>
+                            <div>Max Level</div>
+                            <div>Status</div>
+                            <div>Actions</div>
+                        </div>
+                        <div id="staffInventoryList"></div>
+                    </div>
+                </div>
+
+                <!-- Staff Item Master Section (view only) -->
+                <div class="admin-section" id="staff-item-master">
+                    <div class="data-table">
+                        <div class="table-header">
+                            <span>Items</span>
+                            <div class="table-actions">
+                                <input type="text" class="search-bar" placeholder="Search items..." id="staffItemMasterSearch" style="width:250px;" oninput="renderStaffItemMasterList()">
+                            </div>
+                        </div>
+                        <div class="table-row" style="background:#f7fafc;font-weight:bold;border-bottom:2px solid #e2e8f0;grid-template-columns:1fr 1fr 1.5fr 1fr 1fr 1fr 1fr;">
+                            <div>Item Number</div>
+                            <div>Item Name</div>
+                            <div>Description</div>
+                            <div>Commodity Group</div>
+                            <div>UOM</div>
+                            <div>Item Type</div>
+                            <div>Cost</div>
+                        </div>
+                        <div id="staffItemMasterList"></div>
+                    </div>
+                </div>
+
+                <!-- Staff Item Master Section (view only) - REMOVED, merged above -->
+
+                <!-- Staff PMS Monitoring Section -->
+                <div class="admin-section" id="staff-pms">
+                    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:2rem;">
+                        <div class="stat-card">
+                            <div class="stat-icon orange">📅</div>
+                            <div class="stat-number" id="staffDueThisWeek">0</div>
+                            <div class="stat-label">Due This Week</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon red">⚠️</div>
+                            <div class="stat-number" id="staffOverduePMS">0</div>
+                            <div class="stat-label">Overdue</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon blue">🔔</div>
+                            <div class="stat-number" id="staffUpcomingPMS">0</div>
+                            <div class="stat-label">Upcoming</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon green">✅</div>
+                            <div class="stat-number" id="staffCompletedToday">0</div>
+                            <div class="stat-label">Completed Today</div>
+                        </div>
+                    </div>
+
+                    <div class="data-table">
+                        <div class="table-header">
+                            <span>PMS Schedule</span>
+                            <div class="table-actions">
+                                <input type="text" class="search-bar" placeholder="Search schedule..." id="staffPMSSearch" style="width:250px;">
+                                <button class="btn-icon btn-secondary" onclick="refreshStaffPMSList()">
+                                    <span>🔄</span> Refresh
+                                </button>
+                            </div>
+                        </div>
+                        <div class="table-row" style="background:#f7fafc;font-weight:bold;border-bottom:2px solid #e2e8f0;">
+                            <div>Asset Number</div>
+                            <div>Plate Number</div>
+                            <div>PMS Name</div>
+                            <div>Current Meter</div>
+                            <div>Last PMS Date</div>
+                            <div>Next PMS Due</div>
+                            <div>Status</div>
+                            <div>Actions</div>
+                        </div>
+                        <div id="staffPMSList"></div>
+                    </div>
+                </div>
+
+                <!-- Staff Inventory Transactions Section -->
+                <div class="admin-section" id="staff-inv-transactions">
+                    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:2rem;">
+                        <div class="stat-card">
+                            <div class="stat-icon blue">🔄</div>
+                            <div class="stat-number" id="staffTxnTotal">0</div>
+                            <div class="stat-label">Total Transactions</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon green">📥</div>
+                            <div class="stat-number" id="staffTxnIn">0</div>
+                            <div class="stat-label">Stock In (Receives)</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon red">📤</div>
+                            <div class="stat-number" id="staffTxnOut">0</div>
+                            <div class="stat-label">Stock Out (Issuances)</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon orange">📦</div>
+                            <div class="stat-number" id="staffTxnItems">0</div>
+                            <div class="stat-label">Items Involved</div>
+                        </div>
+                    </div>
+
+                    <div class="data-table">
+                        <div class="table-header">
+                            <span>Transaction History</span>
+                            <div class="table-actions">
+                                <input type="text" class="search-bar" placeholder="Search transactions..." id="staffTxnSearch" style="width:250px;" oninput="renderStaffInventoryTransactions()">
+                            </div>
+                        </div>
+                        <div class="table-row" style="background:#f7fafc;font-weight:bold;border-bottom:2px solid #e2e8f0;grid-template-columns:120px 1fr 1.5fr 80px 80px 100px;">
+                            <div>Date</div>
+                            <div>Item</div>
+                            <div>Description</div>
+                            <div>Type</div>
+                            <div>Qty</div>
+                            <div>Performed By</div>
+                        </div>
+                        <div id="staffTxnList"><div class="table-row" style="text-align:center;color:#718096;padding:2rem;">No transactions found.</div></div>
+                    </div>
+                </div>
+
+                <!-- Staff Assets Section -->
+                <div class="admin-section" id="staff-assets">
+                    <div class="data-table">
+                        <div class="table-header">
+                            <span>All Assets</span>
+                            <div class="table-actions">
+                                <input type="text" class="search-bar" placeholder="Search assets..." id="staffAssetSearch" style="width:250px;">
+                                <button class="btn-icon btn-secondary"><span>📊</span> Export</button>
+                                <button class="btn-icon btn-primary" onclick="openAddAssetModal()"><span>➕</span> Add Asset</button>
+                            </div>
+                        </div>
+                        <div class="table-row" style="background:#f7fafc;font-weight:bold;border-bottom:2px solid #e2e8f0;grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 120px;">
+                            <div>Asset Number</div>
+                            <div>Plate Number</div>
+                            <div>Asset Type</div>
+                            <div>Owner</div>
+                            <div>Odometer (km)</div>
+                            <div>Last Service Date</div>
+                            <div>Next PMS Due</div>
+                            <div>Status</div>
+                            <div>Actions</div>
+                        </div>
+                        <div id="staffAssetsList"></div>
+                    </div>
+                </div>
+
+                <!-- Staff Asset Maintenance Section -->
+                <div class="admin-section" id="staff-asset-servicing">
+                    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:2rem;">
+                        <div class="stat-card">
+                            <div class="stat-icon orange">📋</div>
+                            <div class="stat-number" id="staffTotalServices">0</div>
+                            <div class="stat-label">Total Services</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon blue">🔄</div>
+                            <div class="stat-number" id="staffOngoingServices">0</div>
+                            <div class="stat-label">Ongoing</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon green">✅</div>
+                            <div class="stat-number" id="staffCompletedServices">0</div>
+                            <div class="stat-label">Completed</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon red">⏳</div>
+                            <div class="stat-number" id="staffPendingServices">0</div>
+                            <div class="stat-label">Pending</div>
+                        </div>
+                    </div>
+                    <div class="data-table">
+                        <div class="table-header">
+                            <span>Service Transactions</span>
+                            <div class="table-actions">
+                                <input type="text" class="search-bar" placeholder="Search services..." id="staffServiceSearch">
+                                <button class="btn-icon btn-primary" onclick="openAddServiceModal()">
+                                    <span>➕</span> New Service
+                                </button>
+                            </div>
+                        </div>
+                        <div class="table-row" style="background:#f7fafc;font-weight:bold;border-bottom:2px solid #e2e8f0;grid-template-columns:1fr 1fr 1.5fr 1fr 1fr 1fr 160px;">
+                            <div>Date Serviced</div>
+                            <div>Asset Number</div>
+                            <div>Asset Description</div>
+                            <div>Mechanic Name</div>
+                            <div>Total Cost</div>
+                            <div>Status</div>
+                            <div>Actions</div>
+                        </div>
+                        <div id="staffServicesList"></div>
+                    </div>
+                </div>
+
+                <!-- Staff PMS Management Section -->
+                <div class="admin-section" id="staff-pms-management" style="display:none;"></div>
+
+                <!-- Staff Issuance Section -->
+                <div class="admin-section" id="staff-issuance">
+                    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:2rem;">
+                        <div class="stat-card">
+                            <div class="stat-icon blue">📋</div>
+                            <div class="stat-number" id="staffTotalIssuances">0</div>
+                            <div class="stat-label">Total Issuances</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon orange">🔧</div>
+                            <div class="stat-number" id="staffTotalServicesIss">0</div>
+                            <div class="stat-label">Services</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon green">📦</div>
+                            <div class="stat-number" id="staffTotalMaterials">0</div>
+                            <div class="stat-label">Materials</div>
+                        </div>
+                    </div>
+                    <div class="data-table">
+                        <div class="table-header">
+                            <span>Items Used</span>
+                            <div class="table-actions">
+                                <input type="text" class="search-bar" placeholder="Search items..." id="staffIssuanceSearch">
+                            </div>
+                        </div>
+                        <div style="overflow-x:auto;">
+                            <div class="table-row" style="background:#f7fafc;font-weight:bold;border-bottom:2px solid #e2e8f0;min-width:1400px;grid-template-columns:100px 120px 120px 200px 100px 140px 80px 90px 110px 110px 130px;">
+                                <div>Date</div>
+                                <div>Asset Number</div>
+                                <div>Item Number</div>
+                                <div>Description</div>
+                                <div>Item Type</div>
+                                <div>Commodity Group</div>
+                                <div>UOM</div>
+                                <div>Quantity</div>
+                                <div>Unit Cost</div>
+                                <div>Subtotal</div>
+                                <div>Actions</div>
+                            </div>
+                            <div id="staffIssuancesList" style="min-width:1400px;"></div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- View Item Details Modal -->
+    <div class="modal" id="viewItemModal">
+        <div class="modal-content" style="max-width:680px;padding:0;border-radius:20px;overflow-y:auto;">
+            <div id="viHeader" style="background:linear-gradient(135deg,#1a202c 0%,#2d3748 100%);padding:2rem;color:white;position:relative;overflow:hidden;">
+                <div style="position:absolute;top:-30px;right:-30px;font-size:9rem;opacity:0.06;">📦</div>
+                <button onclick="closeModal('viewItemModal')" style="position:absolute;top:1rem;right:1rem;background:rgba(255,255,255,0.15);border:none;color:white;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center;">&times;</button>
+                <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem;position:relative;z-index:1;">
+                    <div style="background:rgba(255,255,255,0.15);width:56px;height:56px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.8rem;backdrop-filter:blur(10px);">📦</div>
+                    <div>
+                        <div id="viItemName" style="font-size:1.3rem;font-weight:800;letter-spacing:-0.3px;"></div>
+                        <div id="viItemNum" style="font-size:0.85rem;opacity:0.75;margin-top:0.2rem;"></div>
+                    </div>
+                </div>
+                <div style="display:flex;gap:0.75rem;flex-wrap:wrap;position:relative;z-index:1;">
+                    <span id="viStatusBadge"></span>
+                    <span id="viGroupBadge" style="background:rgba(255,255,255,0.15);padding:0.3rem 0.85rem;border-radius:20px;font-size:0.78rem;font-weight:600;"></span>
+                </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-bottom:1px solid #e2e8f0;">
+                <div style="padding:1.25rem;text-align:center;border-right:1px solid #e2e8f0;">
+                    <div style="font-size:0.7rem;color:#718096;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.4rem;">Current Stock</div>
+                    <div id="viStock" style="font-size:1.6rem;font-weight:800;color:#1a202c;"></div>
+                </div>
+                <div style="padding:1.25rem;text-align:center;border-right:1px solid #e2e8f0;">
+                    <div style="font-size:0.7rem;color:#718096;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.4rem;">Unit Price</div>
+                    <div id="viPrice" style="font-size:1.6rem;font-weight:800;color:#E31E24;"></div>
+                </div>
+                <div style="padding:1.25rem;text-align:center;">
+                    <div style="font-size:0.7rem;color:#718096;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.4rem;">Reorder Level</div>
+                    <div id="viReorder" style="font-size:1.6rem;font-weight:800;color:#1a202c;"></div>
+                </div>
+            </div>
+
+            <div style="padding:1.75rem 2rem;">
+                <div style="background:#f7fafc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;border-left:4px solid #E31E24;">
+                    <div style="font-size:0.7rem;color:#718096;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.4rem;">Description</div>
+                    <div id="viDesc" style="color:#4a5568;font-size:0.92rem;line-height:1.6;"></div>
+                </div>
+                <div id="viInfoGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1.5rem;"></div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1.5rem;">
+                    <div style="background:#f7fafc;border-radius:12px;padding:1rem;text-align:center;">
+                        <div style="font-size:2rem;margin-bottom:0.4rem;">🔢</div>
+                        <div id="viBarcode" style="font-family:monospace;font-weight:700;font-size:0.85rem;color:#1a202c;word-break:break-all;"></div>
+                        <div style="font-size:0.7rem;color:#718096;margin-top:0.3rem;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;">Barcode</div>
+                    </div>
+                    <div style="background:#f7fafc;border-radius:12px;padding:1rem;text-align:center;">
+                        <div style="font-size:2rem;margin-bottom:0.4rem;">📱</div>
+                        <div id="viQR" style="font-family:monospace;font-weight:700;font-size:0.85rem;color:#1a202c;word-break:break-all;"></div>
+                        <div style="font-size:0.7rem;color:#718096;margin-top:0.3rem;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;">QR Code</div>
+                    </div>
+                </div>
+                <div style="display:flex;gap:0.75rem;">
+                    <button onclick="closeModal('viewItemModal')" style="flex:1;padding:0.75rem;background:#f1f5f9;border:none;border-radius:10px;font-weight:600;cursor:pointer;color:#4a5568;font-size:0.95rem;">Close</button>
+                    <button onclick="printItemDetails()" style="flex:1;padding:0.75rem;background:linear-gradient(135deg,#E31E24,#C41E3A);border:none;border-radius:10px;font-weight:600;cursor:pointer;color:white;font-size:0.95rem;box-shadow:0 4px 12px rgba(227,30,36,0.3);">🖨️ Print Details</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Staff Inventory Usage Modal -->
+    <div class="modal" id="staffInventoryUsageModal">
+        <div class="modal-content" style="max-width:700px;">
+            <div class="modal-header">
+                <h2>📦 Use Inventory Part</h2>
+                <button class="close-btn" onclick="closeModal('staffInventoryUsageModal')">&times;</button>
+            </div>
+            <div style="padding:1rem 0;">
+                <div style="background:#ebf8ff;border-left:4px solid #3182ce;padding:1rem;border-radius:8px;margin-bottom:2rem;">
+                    <p style="color:#2c5282;font-weight:600;">📋 Inventory Usage Instructions:</p>
+                    <p style="color:#2c5282;font-size:0.9rem;margin-top:0.5rem;">
+                        1. Scan the barcode/QR code of the part you're using<br>
+                        2. Enter the quantity to deduct<br>
+                        3. System will automatically update the inventory
+                    </p>
+                </div>
+                <div class="form-group">
+                    <label>Scan or Select Part</label>
+                    <div style="display:flex;gap:0.5rem;">
+                        <input type="text" id="staffInventorySearch" placeholder="Scan barcode or search part..." style="flex:1;">
+                        <button class="btn-secondary" onclick="openStaffScanModal()">📷 Scan</button>
+                    </div>
+                </div>
+                <div id="staffInventoryItemInfo" style="display:none;background:#f7fafc;padding:1.5rem;border-radius:8px;margin-bottom:1.5rem;">
+                    <h3 style="margin-bottom:1rem;">Part Information</h3>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                        <div><div style="color:#718096;font-size:0.9rem;">Item Name</div><div style="font-weight:bold;" id="staffItemName">-</div></div>
+                        <div><div style="color:#718096;font-size:0.9rem;">Item Code</div><div style="font-weight:bold;" id="staffItemCode">-</div></div>
+                        <div><div style="color:#718096;font-size:0.9rem;">Available Stock</div><div style="font-weight:bold;color:#3182ce;" id="staffCurrentStock">-</div></div>
+                        <div><div style="color:#718096;font-size:0.9rem;">Unit</div><div style="font-weight:bold;" id="staffUnit">-</div></div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Quantity to Use *</label>
+                    <input type="number" id="staffUsageQuantity" placeholder="Enter quantity" min="1" step="1">
+                </div>
+                <div class="form-group">
+                    <label>Used For (Vehicle/Service)</label>
+                    <input type="text" id="staffUsageReason" placeholder="e.g., ABC-1234 - Oil Change">
+                </div>
+                <div id="staffUsageWarning" style="display:none;background:#fed7d7;border-left:4px solid #e53e3e;padding:1rem;border-radius:8px;margin-bottom:1rem;">
+                    <div style="font-weight:600;color:#742a2a;margin-bottom:0.5rem;">⚠️ Warning:</div>
+                    <div style="color:#742a2a;" id="staffWarningMessage">-</div>
+                </div>
+                <div style="display:flex;gap:1rem;margin-top:2rem;">
+                    <button type="button" class="btn-secondary" style="flex:1;" onclick="closeModal('staffInventoryUsageModal')">Cancel</button>
+                    <button type="button" class="btn-success" style="flex:1;" onclick="submitStaffInventoryUsage()">Deduct from Inventory</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Staff Scan Modal -->
+    <div class="modal" id="staffScanModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Scan Part</h2>
+                <button class="close-btn" onclick="closeModal('staffScanModal')">&times;</button>
+            </div>
+            <div style="text-align:center;padding:2rem;">
+                <div style="font-size:5rem;margin-bottom:1rem;">📷</div>
+                <p style="color:#718096;margin-bottom:2rem;">Scan barcode or QR code</p>
+                <div style="background:#f7fafc;border:2px dashed #cbd5e0;border-radius:12px;padding:3rem;margin-bottom:2rem;">
+                    <p style="color:#4a5568;">Camera preview would appear here</p>
+                    <p style="color:#718096;font-size:0.9rem;margin-top:1rem;">In a real implementation, this would use device camera</p>
+                </div>
+                <div class="form-group">
+                    <label>Or Enter Code Manually</label>
+                    <input type="text" id="staffScanInput" placeholder="Enter barcode or QR code">
+                </div>
+                <button class="btn-primary" style="width:100%;margin-top:1rem;" onclick="searchStaffScannedItem()">Search Part</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Staff Receive Delivery Modal -->
+    <div class="modal" id="staffReceiveDeliveryModal">
+        <div class="modal-content" style="max-width:640px;border-radius:20px;overflow:hidden;padding:0;">
+            <div style="background:linear-gradient(135deg,#38a169 0%,#276749 100%);padding:1.75rem 2rem;display:flex;align-items:center;justify-content:space-between;">
+                <div style="display:flex;align-items:center;gap:1rem;">
+                    <div style="background:rgba(255,255,255,0.2);width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.5rem;">📥</div>
+                    <div>
+                        <div style="color:white;font-size:1.25rem;font-weight:700;line-height:1.2;">Receive Items</div>
+                        <div style="color:rgba(255,255,255,0.8);font-size:0.85rem;">Update stock from incoming delivery</div>
+                    </div>
+                </div>
+                <button onclick="closeModal('staffReceiveDeliveryModal')" style="background:rgba(255,255,255,0.2);border:none;color:white;width:36px;height:36px;border-radius:50%;font-size:1.2rem;cursor:pointer;display:flex;align-items:center;justify-content:center;" onmouseover="this.style.background='rgba(255,255,255,0.35)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'">&times;</button>
+            </div>
+            <div style="padding:2rem;background:#f8fafc;">
+                <div style="display:flex;gap:0.5rem;margin-bottom:1.75rem;">
+                    <div style="flex:1;background:white;border-radius:10px;padding:0.75rem 1rem;border:1.5px solid #c6f6d5;display:flex;align-items:center;gap:0.6rem;">
+                        <div style="background:#38a169;color:white;width:22px;height:22px;border-radius:50%;font-size:0.75rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">1</div>
+                        <span style="font-size:0.82rem;color:#276749;font-weight:600;">Search Item</span>
+                    </div>
+                    <div style="flex:1;background:white;border-radius:10px;padding:0.75rem 1rem;border:1.5px solid #bee3f8;display:flex;align-items:center;gap:0.6rem;">
+                        <div style="background:#3182ce;color:white;width:22px;height:22px;border-radius:50%;font-size:0.75rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">2</div>
+                        <span style="font-size:0.82rem;color:#2c5282;font-weight:600;">Enter Quantity</span>
+                    </div>
+                    <div style="flex:1;background:white;border-radius:10px;padding:0.75rem 1rem;border:1.5px solid #e9d8fd;display:flex;align-items:center;gap:0.6rem;">
+                        <div style="background:#805ad5;color:white;width:22px;height:22px;border-radius:50%;font-size:0.75rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">3</div>
+                        <span style="font-size:0.82rem;color:#553c9a;font-weight:600;">Confirm</span>
+                    </div>
+                </div>
+                <div style="background:white;border-radius:14px;padding:1.25rem 1.5rem;margin-bottom:1.25rem;box-shadow:0 1px 4px rgba(0,0,0,0.06);border:1px solid #e2e8f0;">
+                    <label style="font-size:0.8rem;font-weight:700;color:#4a5568;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:0.6rem;">🔍 Scan or Search Item</label>
+                    <div style="display:flex;gap:0.6rem;">
+                        <input type="text" id="deliveryItemSearch" placeholder="Enter item name, code, or barcode..." style="flex:1;border:1.5px solid #e2e8f0;border-radius:10px;padding:0.7rem 1rem;font-size:0.95rem;outline:none;transition:border 0.2s;" onfocus="this.style.borderColor='#38a169'" onblur="this.style.borderColor='#e2e8f0'">
+                        <button onclick="openDeliveryScanModal()" style="background:linear-gradient(135deg,#4299e1,#3182ce);color:white;border:none;border-radius:10px;padding:0.7rem 1.1rem;font-size:0.9rem;font-weight:600;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:0.4rem;" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">📷 Scan</button>
+                    </div>
+                </div>
+                <div id="deliveryItemInfo" style="display:none;background:white;border-radius:14px;padding:1.25rem 1.5rem;margin-bottom:1.25rem;box-shadow:0 1px 4px rgba(0,0,0,0.06);border:1.5px solid #c6f6d5;">
+                    <div style="font-size:0.8rem;font-weight:700;color:#276749;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:1rem;display:flex;align-items:center;gap:0.5rem;">
+                        <span style="background:#c6f6d5;padding:0.2rem 0.6rem;border-radius:20px;">✅ Item Found</span>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+                        <div style="background:#f7fafc;border-radius:10px;padding:0.85rem 1rem;"><div style="color:#718096;font-size:0.78rem;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:0.3rem;">Item Name</div><div style="font-weight:700;color:#1a202c;font-size:0.95rem;" id="deliveryItemName">-</div></div>
+                        <div style="background:#f7fafc;border-radius:10px;padding:0.85rem 1rem;"><div style="color:#718096;font-size:0.78rem;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:0.3rem;">Item Code</div><div style="font-weight:700;color:#1a202c;font-size:0.95rem;" id="deliveryItemCode">-</div></div>
+                        <div style="background:#ebf8ff;border-radius:10px;padding:0.85rem 1rem;border-left:3px solid #3182ce;"><div style="color:#2c5282;font-size:0.78rem;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:0.3rem;">Current Stock</div><div style="font-weight:800;color:#2b6cb0;font-size:1.1rem;" id="deliveryCurrentStock">-</div></div>
+                        <div style="background:#f7fafc;border-radius:10px;padding:0.85rem 1rem;"><div style="color:#718096;font-size:0.78rem;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:0.3rem;">Unit</div><div style="font-weight:700;color:#1a202c;font-size:0.95rem;" id="deliveryUnit">-</div></div>
+                    </div>
+                </div>
+                <div style="background:white;border-radius:14px;padding:1.25rem 1.5rem;margin-bottom:1.25rem;box-shadow:0 1px 4px rgba(0,0,0,0.06);border:1px solid #e2e8f0;">
+                    <label style="font-size:0.8rem;font-weight:700;color:#4a5568;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:0.6rem;">📦 Quantity Received *</label>
+                    <input type="number" id="deliveryQuantity" placeholder="0" min="1" step="1" style="width:100%;border:1.5px solid #e2e8f0;border-radius:10px;padding:0.7rem 1rem;font-size:1rem;font-weight:600;outline:none;transition:border 0.2s;box-sizing:border-box;" onfocus="this.style.borderColor='#38a169'" onblur="this.style.borderColor='#e2e8f0'">
+                </div>
+                <div id="deliveryPreview" style="display:none;background:linear-gradient(135deg,#ebf8ff,#bee3f8);border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.25rem;border-left:4px solid #3182ce;">
+                    <div style="font-weight:700;color:#2c5282;margin-bottom:0.3rem;font-size:0.9rem;">📊 Stock Update Preview</div>
+                    <div style="color:#2b6cb0;font-size:0.95rem;" id="deliveryPreviewMessage">-</div>
+                </div>
+                <div style="display:flex;gap:0.75rem;margin-top:0.5rem;">
+                    <button type="button" onclick="closeModal('staffReceiveDeliveryModal')" style="flex:1;padding:0.9rem;background:white;color:#4a5568;border:1.5px solid #e2e8f0;border-radius:12px;font-weight:600;font-size:0.95rem;cursor:pointer;" onmouseover="this.style.background='#f7fafc'" onmouseout="this.style.background='white'">Cancel</button>
+                    <button type="button" onclick="submitDeliveryReceived()" style="flex:2;padding:0.9rem;background:linear-gradient(135deg,#38a169,#276749);color:white;border:none;border-radius:12px;font-weight:700;font-size:0.95rem;cursor:pointer;box-shadow:0 4px 14px rgba(56,161,105,0.35);display:flex;align-items:center;justify-content:center;gap:0.5rem;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">📥 Confirm & Update Stock</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delivery Scan Modal -->
+    <div class="modal" id="deliveryScanModal">
+        <div class="modal-content" style="max-width:420px;border-radius:20px;overflow:hidden;padding:0;">
+            <div style="background:linear-gradient(135deg,#4299e1,#2b6cb0);padding:1.5rem 1.75rem;display:flex;align-items:center;justify-content:space-between;">
+                <div style="display:flex;align-items:center;gap:0.85rem;">
+                    <div style="background:rgba(255,255,255,0.2);width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;">📷</div>
+                    <div style="color:white;font-size:1.1rem;font-weight:700;">Scan Item</div>
+                </div>
+                <button onclick="closeModal('deliveryScanModal')" style="background:rgba(255,255,255,0.2);border:none;color:white;width:32px;height:32px;border-radius:50%;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;" onmouseover="this.style.background='rgba(255,255,255,0.35)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'">&times;</button>
+            </div>
+            <div style="padding:1.75rem;background:#f8fafc;">
+                <div style="background:white;border:2px dashed #bee3f8;border-radius:14px;padding:2rem;text-align:center;margin-bottom:1.5rem;">
+                    <div style="font-size:3.5rem;margin-bottom:0.75rem;">📷</div>
+                    <div style="color:#4a5568;font-weight:600;margin-bottom:0.4rem;">Camera Preview</div>
+                    <div style="color:#a0aec0;font-size:0.85rem;">Point camera at barcode or QR code</div>
+                </div>
+                <div style="background:white;border-radius:12px;padding:1.25rem;border:1px solid #e2e8f0;">
+                    <label style="font-size:0.8rem;font-weight:700;color:#4a5568;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:0.6rem;">Or Enter Code Manually</label>
+                    <input type="text" id="deliveryScanInput" placeholder="Enter barcode or QR code" style="width:100%;border:1.5px solid #e2e8f0;border-radius:10px;padding:0.7rem 1rem;font-size:0.95rem;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='#4299e1'" onblur="this.style.borderColor='#e2e8f0'">
+                    <button onclick="searchDeliveryScannedItem()" style="width:100%;margin-top:0.75rem;padding:0.85rem;background:linear-gradient(135deg,#4299e1,#2b6cb0);color:white;border:none;border-radius:10px;font-weight:700;font-size:0.95rem;cursor:pointer;box-shadow:0 4px 12px rgba(66,153,225,0.3);" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">🔍 Search Item</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Staff View All Inventory Modal -->
+    <div class="modal" id="staffViewInventoryModal">
+        <div class="modal-content" style="max-width:900px;">
+            <div class="modal-header">
+                <h2>📋 All Inventory Items</h2>
+                <button class="close-btn" onclick="closeModal('staffViewInventoryModal')">&times;</button>
+            </div>
+            <div style="padding:1rem 0;">
+                <div class="form-group">
+                    <input type="text" id="staffViewInventorySearch" placeholder="Search items..." style="width:100%;">
+                </div>
+                <div style="max-height:500px;overflow-y:auto;">
+                    <div class="data-table">
+                        <div class="table-row" style="background:#f7fafc;font-weight:bold;border-bottom:2px solid #e2e8f0;position:sticky;top:0;">
+                            <div>Item Name</div>
+                            <div>Item Number</div>
+                            <div>Stock</div>
+                            <div>Status</div>
+                            <div>Actions</div>
+                        </div>
+                        <div id="staffViewInventoryList"></div>
+                    </div>
+                </div>
+                <div style="margin-top:1.5rem;text-align:center;">
+                    <button class="btn-secondary" style="padding:1rem 2rem;" onclick="closeModal('staffViewInventoryModal')">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Service Modal -->
+    <div class="modal" id="addServiceModal">
+        <div class="modal-content" style="max-width:800px;">
+            <div class="modal-header">
+                <h2 id="serviceModalTitle">New Service Transaction</h2>
+                <button class="close-btn" onclick="closeModal('addServiceModal')">&times;</button>
+            </div>
+            <form id="addServiceForm">
+                <div class="form-group">
+                    <label>Plate Number *</label>
+                    <div style="display:flex;gap:0.5rem;">
+                        <input type="text" id="servicePlateSearch" placeholder="Type or scan plate number..." style="flex:1;text-transform:uppercase;" oninput="searchAssetByPlate(this.value)" required>
+                        <button type="button" class="btn-secondary" onclick="openServiceScanModal()">📷 Scan</button>
+                    </div>
+                    <div id="plateSuggestions" style="display:none;border:1px solid #e2e8f0;border-radius:8px;background:white;box-shadow:0 4px 12px rgba(0,0,0,0.1);margin-top:0.25rem;max-height:160px;overflow-y:auto;z-index:100;position:relative;"></div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                    <div class="form-group">
+                        <label>Asset Number</label>
+                        <input type="text" id="serviceAssetNumDisplay" readonly style="background:#f7fafc;">
+                        <input type="hidden" name="assetNum" id="serviceAssetNumHidden">
+                    </div>
+                    <div class="form-group">
+                        <label>Asset Type</label>
+                        <input type="text" id="serviceAssetTypeDisplay" readonly style="background:#f7fafc;">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Asset Description</label>
+                    <input type="text" name="assetDescription" id="serviceAssetDescription" placeholder="Enter asset description...">
+                </div>
+                <div class="form-group">
+                    <label>Mechanic Name *</label>
+                    <input type="text" name="mechanicName" id="serviceMechanicName" placeholder="Enter mechanic name..." required>
+                </div>
+                <div class="form-group">
+                    <label>Date Serviced *</label>
+                    <input type="date" name="dateServiced" required>
+                </div>
+                <div style="background:#f7fafc;padding:1.5rem;border-radius:8px;margin-bottom:1rem;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+                        <h3 style="color:#1a202c;margin:0;">Services Rendered</h3>
+                        <button type="button" class="btn-secondary" style="padding:0.4rem 0.9rem;font-size:0.85rem;" onclick="addServiceRow()">+ Add Row</button>
+                    </div>
+                    <div style="display:grid;grid-template-columns:minmax(0,3fr) 70px minmax(0,1fr) 90px 32px;gap:0.4rem;margin-bottom:0.5rem;">
+                        <div style="font-size:0.8rem;font-weight:600;color:#718096;">Item Name</div>
+                        <div style="font-size:0.8rem;font-weight:600;color:#718096;">Qty</div>
+                        <div style="font-size:0.8rem;font-weight:600;color:#718096;">UOM</div>
+                        <div style="font-size:0.8rem;font-weight:600;color:#718096;">Cost (₱)</div>
+                        <div></div>
+                    </div>
+                    <div id="serviceRowsContainer"></div>
+                </div>
+                <div style="background:#f7fafc;padding:1.5rem;border-radius:8px;margin-bottom:1rem;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+                        <h3 style="color:#1a202c;margin:0;">Materials Used</h3>
+                        <button type="button" class="btn-secondary" style="padding:0.4rem 0.9rem;font-size:0.85rem;" onclick="addMaterialRow()">+ Add Row</button>
+                    </div>
+                    <div style="display:grid;grid-template-columns:minmax(0,3fr) 70px minmax(0,1fr) 90px 32px 32px;gap:0.4rem;margin-bottom:0.5rem;">
+                        <div style="font-size:0.8rem;font-weight:600;color:#718096;">Item Name</div>
+                        <div style="font-size:0.8rem;font-weight:600;color:#718096;">Qty</div>
+                        <div style="font-size:0.8rem;font-weight:600;color:#718096;">UOM</div>
+                        <div style="font-size:0.8rem;font-weight:600;color:#718096;">Cost (₱)</div>
+                        <div style="font-size:0.8rem;font-weight:600;color:#718096;">Scan</div>
+                        <div></div>
+                    </div>
+                    <div id="materialRowsContainer"></div>
+                </div>
+                <div style="background:#ebf8ff;padding:1.5rem;border-radius:8px;margin-bottom:1rem;border-left:4px solid #3182ce;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div style="font-weight:600;color:#2c5282;">Total Cost:</div>
+                        <div style="font-size:1.5rem;font-weight:bold;color:#2c5282;" id="totalCostDisplay">₱0.00</div>
+                    </div>
+                </div>
+                <div style="display:flex;gap:1rem;margin-top:2rem;">
+                    <button type="button" class="btn-secondary" style="flex:1;" onclick="closeModal('addServiceModal')">Cancel</button>
+                    <button type="submit" class="btn-primary" style="flex:1;">Save Service</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Service Details Modal -->
+    <div class="modal" id="serviceDetailsModal">
+        <div class="modal-content" style="max-width:700px;padding:0;border-radius:20px;overflow:hidden;">
+            <div id="serviceDetailsHeader" style="background:linear-gradient(135deg,#E31E24 0%,#C41E3A 100%);padding:2rem;color:white;position:relative;overflow:hidden;">
+                <div style="position:absolute;top:-30px;right:-30px;font-size:10rem;opacity:0.08;">🔧</div>
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;position:relative;z-index:1;">
+                    <div>
+                        <div style="font-size:0.8rem;opacity:0.85;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:0.4rem;">Service Transaction</div>
+                    </div>
+                    <button onclick="closeModal('serviceDetailsModal')" style="background:rgba(255,255,255,0.2);border:none;color:white;width:36px;height:36px;border-radius:50%;font-size:1.2rem;cursor:pointer;display:flex;align-items:center;justify-content:center;" onmouseover="this.style.background='rgba(255,255,255,0.35)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'">&times;</button>
+                </div>
+            </div>
+            <div style="padding:2rem;background:#f8fafc;max-height:65vh;overflow-y:auto;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem;">
+                    <div style="background:white;border-radius:14px;padding:1.25rem;border:1px solid #e2e8f0;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+                        <div style="font-size:0.75rem;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem;">🚗 Asset</div>
+                        <div style="font-size:1rem;font-weight:700;color:#1a202c;" id="sdAssetNum">-</div>
+                        <div style="font-size:0.85rem;color:#718096;margin-top:0.2rem;" id="sdAssetDesc">-</div>
+                    </div>
+                    <div style="background:white;border-radius:14px;padding:1.25rem;border:1px solid #e2e8f0;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+                        <div style="font-size:0.75rem;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem;">📅 Date Serviced</div>
+                        <div style="font-size:1rem;font-weight:700;color:#1a202c;" id="sdDate">-</div>
+                        <div style="font-size:0.85rem;color:#718096;margin-top:0.2rem;" id="sdMechanic">-</div>
+                    </div>
+                </div>
+                <div style="background:white;border-radius:14px;padding:1.5rem;margin-bottom:1.25rem;border:1px solid #e2e8f0;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+                    <div style="font-size:0.8rem;font-weight:700;color:#4a5568;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:1rem;">
+                        <span style="background:#ebf8ff;color:#2c5282;padding:0.2rem 0.6rem;border-radius:20px;">🔧 Services Rendered</span>
+                    </div>
+                    <div id="sdServicesTable"></div>
+                </div>
+                <div style="background:white;border-radius:14px;padding:1.5rem;margin-bottom:1.25rem;border:1px solid #e2e8f0;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+                    <div style="font-size:0.8rem;font-weight:700;color:#4a5568;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:1rem;">
+                        <span style="background:#f0fff4;color:#276749;padding:0.2rem 0.6rem;border-radius:20px;">📦 Materials Used</span>
+                    </div>
+                    <div id="sdPartsTable"></div>
+                </div>
+                <div style="background:linear-gradient(135deg,#ebf8ff,#bee3f8);border-radius:14px;padding:1.25rem 1.5rem;border-left:4px solid #3182ce;display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+                    <div style="font-weight:700;color:#2c5282;font-size:0.95rem;">💰 Total Cost</div>
+                    <div style="font-size:1.75rem;font-weight:800;color:#2b6cb0;" id="sdTotalCost">₱0.00</div>
+                </div>
+                <div style="background:white;border-radius:14px;padding:1.25rem;border:1px solid #e2e8f0;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+                        <div>
+                            <div style="font-size:0.75rem;color:#718096;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:0.3rem;">Created By</div>
+                            <div style="font-weight:600;color:#1a202c;font-size:0.9rem;" id="sdCreatedBy">-</div>
+                        </div>
+                        <div>
+                            <div style="font-size:0.75rem;color:#718096;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:0.3rem;">Created On</div>
+                            <div style="font-weight:600;color:#1a202c;font-size:0.9rem;" id="sdCreatedOn">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div style="padding:1.25rem 2rem;background:white;border-top:1px solid #e2e8f0;display:flex;gap:0.75rem;">
+                <button onclick="closeModal('serviceDetailsModal')" style="flex:1;padding:0.85rem;background:#f7fafc;color:#4a5568;border:1.5px solid #e2e8f0;border-radius:12px;font-weight:600;cursor:pointer;" onmouseover="this.style.background='#edf2f7'" onmouseout="this.style.background='#f7fafc'">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Service Plate Scan Modal -->
+    <div class="modal" id="serviceScanModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Scan Plate Number</h2>
+                <button class="close-btn" onclick="closeModal('serviceScanModal')">&times;</button>
+            </div>
+            <div style="text-align:center;padding:2rem;">
+                <div style="font-size:5rem;margin-bottom:1rem;">📷</div>
+                <p style="color:#718096;margin-bottom:2rem;">Take a photo or scan the plate number</p>
+                <div style="background:#f7fafc;border:2px dashed #cbd5e0;border-radius:12px;padding:3rem;margin-bottom:2rem;">
+                    <p style="color:#4a5568;">Camera preview would appear here</p>
+                </div>
+                <div class="form-group">
+                    <label>Or Enter Plate Number Manually</label>
+                    <input type="text" id="serviceScanInput" placeholder="e.g., ABC-1234" style="text-transform:uppercase;">
+                </div>
+                <button class="btn-primary" style="width:100%;margin-top:1rem;" onclick="applyScannedPlate()">Search Asset</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Material Item Scan/Search Modal -->
+    <div class="modal" id="matScanModal">
+        <div class="modal-content" style="max-width:480px;border-radius:20px;overflow:hidden;padding:0;">
+            <div style="background:linear-gradient(135deg,#4299e1,#2b6cb0);padding:1.5rem 1.75rem;display:flex;align-items:center;justify-content:space-between;">
+                <div style="display:flex;align-items:center;gap:0.85rem;">
+                    <div style="background:rgba(255,255,255,0.2);width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;">📷</div>
+                    <div>
+                        <div style="color:white;font-size:1.1rem;font-weight:700;">Scan or Search Item</div>
+                        <div style="color:rgba(255,255,255,0.8);font-size:0.8rem;">Barcode, QR code, or item name</div>
+                    </div>
+                </div>
+                <button onclick="closeModal('matScanModal')" style="background:rgba(255,255,255,0.2);border:none;color:white;width:32px;height:32px;border-radius:50%;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;" onmouseover="this.style.background='rgba(255,255,255,0.35)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'">&times;</button>
+            </div>
+            <div style="padding:1.75rem;background:#f8fafc;">
+                <!-- Search bar -->
+                <div style="background:white;border-radius:12px;padding:1.25rem;border:1px solid #e2e8f0;margin-bottom:1rem;">
+                    <label style="font-size:0.78rem;font-weight:700;color:#4a5568;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:0.5rem;">Search by name, item no., or barcode</label>
+                    <div style="display:flex;gap:0.5rem;">
+                        <input type="text" id="matScanInput" placeholder="e.g. Engine Oil, ITM-001, 123456..." style="flex:1;border:1.5px solid #e2e8f0;border-radius:8px;padding:0.65rem 0.9rem;font-size:0.95rem;outline:none;" onfocus="this.style.borderColor='#4299e1'" onblur="this.style.borderColor='#e2e8f0'" oninput="searchMatScanItem()">
+                        <button onclick="searchMatScanItem()" style="background:linear-gradient(135deg,#4299e1,#2b6cb0);color:white;border:none;border-radius:8px;padding:0.65rem 1rem;font-weight:700;cursor:pointer;white-space:nowrap;" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">🔍</button>
+                    </div>
+                </div>
+
+                <!-- Search results list -->
+                <div id="matScanResults" style="max-height:220px;overflow-y:auto;margin-bottom:0.5rem;"></div>
+
+                <!-- Item detail + qty/uom/cost panel -->
+                <div id="matScanItemDetail" style="display:none;">
+                    <div style="background:white;border-radius:12px;border:1.5px solid #bee3f8;padding:1.25rem;margin-bottom:1rem;">
+                        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:0.85rem;">
+                            <div>
+                                <div id="matScanDetailName" style="font-size:1rem;font-weight:800;color:#1a202c;"></div>
+                                <div id="matScanDetailNum" style="font-size:0.78rem;color:#718096;margin-top:0.15rem;"></div>
+                            </div>
+                            <button onclick="backToMatScanSearch()" style="background:#ebf8ff;border:1px solid #bee3f8;border-radius:8px;color:#2b6cb0;font-size:0.78rem;font-weight:700;padding:0.3rem 0.7rem;cursor:pointer;white-space:nowrap;flex-shrink:0;margin-left:0.75rem;">← Back</button>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1.1rem;">
+                            <span style="font-size:0.78rem;color:#718096;font-weight:600;">Stock:</span>
+                            <span id="matScanDetailStock"></span>
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:0.75rem;">
+                            <div>
+                                <label style="font-size:0.75rem;font-weight:700;color:#4a5568;text-transform:uppercase;letter-spacing:0.4px;display:block;margin-bottom:0.35rem;">Quantity *</label>
+                                <input type="number" id="matScanDetailQty" placeholder="0" min="1" step="1" oninput="onMatScanQtyInput()" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:0.6rem 0.8rem;font-size:1rem;font-weight:700;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='#4299e1'" onblur="this.style.borderColor='#e2e8f0'">
+                                <div id="matScanQtyWarn" style="display:none;margin-top:0.35rem;font-size:0.78rem;color:#c53030;background:#fff5f5;border-left:3px solid #e53e3e;padding:0.3rem 0.6rem;border-radius:4px;"></div>
+                            </div>
+                            <div>
+                                <label style="font-size:0.75rem;font-weight:700;color:#4a5568;text-transform:uppercase;letter-spacing:0.4px;display:block;margin-bottom:0.35rem;">UOM</label>
+                                <input type="text" id="matScanDetailUOM" readonly style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:0.6rem 0.8rem;font-size:0.95rem;background:#f7fafc;box-sizing:border-box;color:#4a5568;">
+                            </div>
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+                            <div>
+                                <label style="font-size:0.75rem;font-weight:700;color:#4a5568;text-transform:uppercase;letter-spacing:0.4px;display:block;margin-bottom:0.35rem;">Unit Price</label>
+                                <div id="matScanDetailUnitPrice" style="padding:0.6rem 0.8rem;background:#f7fafc;border-radius:8px;font-size:0.95rem;font-weight:600;color:#4a5568;border:1.5px solid #e2e8f0;"></div>
+                            </div>
+                            <div>
+                                <label style="font-size:0.75rem;font-weight:700;color:#4a5568;text-transform:uppercase;letter-spacing:0.4px;display:block;margin-bottom:0.35rem;">Total Cost (₱)</label>
+                                <input type="number" id="matScanDetailCost" readonly placeholder="0.00" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:0.6rem 0.8rem;font-size:0.95rem;font-weight:700;background:#f0fff4;box-sizing:border-box;color:#276749;">
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="confirmMatScanItem()" style="width:100%;padding:0.9rem;background:linear-gradient(135deg,#4299e1,#2b6cb0);color:white;border:none;border-radius:12px;font-weight:700;font-size:0.95rem;cursor:pointer;box-shadow:0 4px 12px rgba(66,153,225,0.3);margin-bottom:0.5rem;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">✅ Add to Materials</button>
+                </div>
+
+                <button onclick="closeModal('matScanModal')" style="width:100%;margin-top:0.25rem;padding:0.75rem;background:white;color:#4a5568;border:1.5px solid #e2e8f0;border-radius:10px;font-weight:600;cursor:pointer;" onmouseover="this.style.background='#f7fafc'" onmouseout="this.style.background='white'">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Issuance Details Modal -->
+    <div class="modal" id="issuanceDetailsModal">
+        <div class="modal-content" style="max-width:640px;padding:0;border-radius:20px;overflow:hidden;">
+            <div style="background:linear-gradient(135deg,#2d3748 0%,#1a202c 100%);padding:1.75rem 2rem;color:white;position:relative;overflow:hidden;">
+                <div style="position:absolute;top:-20px;right:-20px;font-size:8rem;opacity:0.06;">📦</div>
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;position:relative;z-index:1;">
+                    <div>
+                        <div style="font-size:0.72rem;opacity:0.7;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:0.4rem;">Issuance Record</div>
+                        <div style="font-size:1.3rem;font-weight:800;" id="idAssetNum">-</div>
+                        <div style="font-size:0.9rem;opacity:0.8;margin-top:0.25rem;" id="idAssetDesc">-</div>
+                        <div style="margin-top:0.75rem;" id="idItemTypeBadge"></div>
+                    </div>
+                    <button onclick="closeModal('issuanceDetailsModal')" style="background:rgba(255,255,255,0.15);border:none;color:white;width:36px;height:36px;border-radius:50%;font-size:1.2rem;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;" onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">&times;</button>
+                </div>
+            </div>
+            <div style="padding:1.75rem 2rem;background:#f8fafc;max-height:65vh;overflow-y:auto;">
+                <div style="background:linear-gradient(135deg,#E31E24,#C41E3A);border-radius:14px;padding:1.25rem 1.5rem;margin-bottom:1.5rem;display:flex;justify-content:space-between;align-items:center;color:white;">
+                    <div>
+                        <div style="font-size:0.72rem;opacity:0.85;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.3rem;">Subtotal</div>
+                        <div style="font-size:2rem;font-weight:800;" id="idSubtotal">₱0.00</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:0.72rem;opacity:0.85;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.3rem;">Date</div>
+                        <div style="font-size:1rem;font-weight:700;" id="idDate">-</div>
+                    </div>
+                </div>
+                <div style="background:white;border-radius:14px;padding:1.5rem;margin-bottom:1.25rem;border:1px solid #e2e8f0;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+                    <div style="font-size:0.72rem;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:1.25rem;">📋 Item Details</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.85rem;" id="idItemGrid"></div>
+                </div>
+                <div style="background:white;border-radius:14px;padding:1.5rem;border:1px solid #e2e8f0;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+                    <div style="font-size:0.72rem;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:1.25rem;">💰 Cost Breakdown</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.85rem;">
+                        <div style="background:#f7fafc;border-radius:10px;padding:1rem;text-align:center;">
+                            <div style="font-size:0.7rem;color:#718096;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:0.4rem;">Quantity</div>
+                            <div style="font-size:1.4rem;font-weight:800;color:#1a202c;" id="idQty">-</div>
+                            <div style="font-size:0.75rem;color:#a0aec0;" id="idUOM">-</div>
+                        </div>
+                        <div style="background:#ebf8ff;border-radius:10px;padding:1rem;text-align:center;border-left:3px solid #3182ce;">
+                            <div style="font-size:0.7rem;color:#2c5282;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:0.4rem;">Unit Cost</div>
+                            <div style="font-size:1.2rem;font-weight:800;color:#2b6cb0;" id="idUnitCost">-</div>
+                        </div>
+                        <div style="background:linear-gradient(135deg,#fff5f5,#fed7d7);border-radius:10px;padding:1rem;text-align:center;border-left:3px solid #E31E24;">
+                            <div style="font-size:0.7rem;color:#c53030;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:0.4rem;">Subtotal</div>
+                            <div style="font-size:1.2rem;font-weight:800;color:#E31E24;" id="idSubtotal2">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div style="padding:1.25rem 2rem;background:white;border-top:1px solid #e2e8f0;display:flex;gap:0.75rem;">
+                <button onclick="closeModal('issuanceDetailsModal')" style="flex:1;padding:0.85rem;background:#f7fafc;color:#4a5568;border:1.5px solid #e2e8f0;border-radius:12px;font-weight:600;cursor:pointer;" onmouseover="this.style.background='#edf2f7'" onmouseout="this.style.background='#f7fafc'">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="data.js"></script>
+    <script src="staff.js"></script>
+</body>
+</html>
