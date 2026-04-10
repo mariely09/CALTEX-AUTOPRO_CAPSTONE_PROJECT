@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'barcode_scanner_screen.dart';
 
 class AdminVehicleMaintenance extends StatefulWidget {
@@ -10,52 +12,46 @@ class AdminVehicleMaintenance extends StatefulWidget {
 
 class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
   static const _red = Color(0xFFE8001C);
+  static const _col = 'maintenance';
 
-  // Service items — synced from Item Master (type: Service)
-  static const _serviceItems = [
-    'Oil Change Service',
-  ];
-
-  // Service item master with UOM and cost — synced from Item Master
-  static const _serviceItemData = {
-    'Oil Change Service': {'uom': 'job', 'cost': '500'},
-  };
-
-  // Material items — synced from Item Master (type: Material)
-  static const _materialItems = [
-    'Engine Oil 10W-40', 'Oil Filter', 'Brake Pads',
-  ];
-
-  // Item master with UOM and cost for auto-fill — synced from Item Master
-  static const _itemMasterData = {
-    'Engine Oil 10W-40': {'uom': 'L',   'cost': '450',  'barcode': '1234567890', 'qr': 'QR-ITM-001'},
-    'Oil Filter':        {'uom': 'pcs', 'cost': '180',  'barcode': '0987654321', 'qr': 'QR-ITM-002'},
-    'Brake Pads':        {'uom': 'set', 'cost': '1200', 'barcode': '1122334455', 'qr': 'QR-ITM-003'},
-  };
-
-  static const _vehicles = {
-    'ABC-1234': {'desc': 'Isuzu Truck NQR 2021', 'owner': 'Juan Dela Cruz', 'type': 'Truck'},
-    'XYZ-5678': {'desc': 'Toyota Hilux 2020', 'owner': 'Pedro Santos', 'type': 'Car'},
-    'DEF-9012': {'desc': 'Mitsubishi L300 2019', 'owner': 'Jose Reyes', 'type': 'Truck'},
-  };
-
-  final List<Map<String, String>> _services = [
-    {'id': 'SVC-001', 'plate': 'ABC-1234', 'desc': 'Isuzu Truck NQR 2021', 'mechanic': 'Juan Dela Cruz', 'date': 'Mar 28, 2026', 'cost': '₱2,500', 'status': 'Completed'},
-    {'id': 'SVC-002', 'plate': 'XYZ-5678', 'desc': 'Toyota Hilux 2020', 'mechanic': 'Pedro Santos', 'date': 'Mar 28, 2026', 'cost': '₱1,800', 'status': 'Ongoing'},
-    {'id': 'SVC-003', 'plate': 'DEF-9012', 'desc': 'Mitsubishi L300 2019', 'mechanic': 'Jose Reyes', 'date': 'Mar 27, 2026', 'cost': '₱3,200', 'status': 'Pending'},
-  ];
-
-  // Stores services rendered rows per service id: { 'SVC-001': [{'name':..,'qty':..,'uom':..,'cost':..}] }
-  final Map<String, List<Map<String, String>>> _svcRowsData = {};
-  final Map<String, List<Map<String, String>>> _matRowsData = {};
-
-  List<Map<String, String>> _filtered = [];
   final _searchCtrl = TextEditingController();
+  bool _searching = false;
+  String _searchQuery = '';
+
+  CollectionReference get _db => FirebaseFirestore.instance.collection(_col);
+
+  // Cached lookups
+  Map<String, Map<String, dynamic>> _vehicleMap = {};   // plate -> data
+  Map<String, Map<String, dynamic>> _itemMasterMap = {}; // name -> data
+  List<String> _serviceItems = [];
+  List<String> _materialItems = [];
+  bool _lookupLoaded = false;
 
   @override
   void initState() {
     super.initState();
-    _filtered = List.from(_services);
+    _loadLookups();
+  }
+
+  Future<void> _loadLookups() async {
+    final vSnap = await FirebaseFirestore.instance.collection('vehicles').get();
+    final iSnap = await FirebaseFirestore.instance.collection('item_master').get();
+    if (!mounted) return;
+    _vehicleMap = {
+      for (final d in vSnap.docs)
+        (d['plate'] as String? ?? ''): d.data() as Map<String, dynamic>
+    };
+    _itemMasterMap = {
+      for (final d in iSnap.docs)
+        (d['name'] as String? ?? ''): d.data() as Map<String, dynamic>
+    };
+    _serviceItems = _itemMasterMap.entries
+        .where((e) => e.value['type'] == 'Service')
+        .map((e) => e.key).toList()..sort();
+    _materialItems = _itemMasterMap.entries
+        .where((e) => e.value['type'] == 'Material')
+        .map((e) => e.key).toList()..sort();
+    setState(() => _lookupLoaded = true);
   }
 
   @override
@@ -64,35 +60,36 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
     super.dispose();
   }
 
-  void _onSearch(String q) {
-    setState(() {
-      _filtered = _services.where((s) =>
-        s['id']!.toLowerCase().contains(q.toLowerCase()) ||
-        s['plate']!.toLowerCase().contains(q.toLowerCase()) ||
-        s['mechanic']!.toLowerCase().contains(q.toLowerCase())
-      ).toList();
-    });
-  }
-
   Color _statusColor(String status) {
-    if (status == 'Completed') return Colors.green;
-    if (status == 'Ongoing') return Colors.orange;
-    return const Color(0xFF718096);
+    switch (status) {
+      case 'Completed': return Colors.green;
+      case 'Ongoing':   return Colors.orange;
+      case 'Pending':   return const Color(0xFF718096);
+      default:          return const Color(0xFF718096);
+    }
   }
 
-  bool _searching = false;
+  Future<String> _nextSvcId() async {
+    final snap = await _db.orderBy('createdAt', descending: true).limit(1).get();
+    if (snap.docs.isEmpty) return 'SVC-001';
+    final last = snap.docs.first['id'] as String? ?? 'SVC-000';
+    final n = int.tryParse(last.replaceAll('SVC-', '')) ?? 0;
+    return 'SVC-${(n + 1).toString().padLeft(3, '0')}';
+  }
 
   @override
   Widget build(BuildContext context) {
-    final total = _services.length;
-    final ongoing = _services.where((s) => s['status'] == 'Ongoing').length;
-    final completed = _services.where((s) => s['status'] == 'Completed').length;
-    final pending = _services.where((s) => s['status'] == 'Pending').length;
-
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddServiceModal(),
+        onPressed: () {
+          if (!_lookupLoaded) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Loading data, please wait...'), duration: Duration(seconds: 1)));
+            return;
+          }
+          _showAddServiceModal();
+        },
         backgroundColor: _red,
         child: const Icon(Icons.add, color: Colors.white, size: 28),
       ),
@@ -104,7 +101,7 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
             ? TextField(
                 controller: _searchCtrl,
                 autofocus: true,
-                onChanged: _onSearch,
+                onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
                 style: const TextStyle(color: Colors.white),
                 decoration: const InputDecoration(
                   hintText: 'Search services...',
@@ -117,42 +114,78 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
         actions: [
           IconButton(
             icon: Icon(_searching ? Icons.close : Icons.search, color: Colors.white),
-            onPressed: () {
-              setState(() {
-                _searching = !_searching;
-                if (!_searching) {
-                  _searchCtrl.clear();
-                  _filtered = List.from(_services);
-                }
-              });
-            },
+            onPressed: () => setState(() {
+              _searching = !_searching;
+              if (!_searching) { _searchCtrl.clear(); _searchQuery = ''; }
+            }),
           ),
         ],
       ),
-      body: Column(children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: Row(children: [
-            _statChip('Total', '$total', Colors.blue),
-            const SizedBox(width: 8),
-            _statChip('Ongoing', '$ongoing', Colors.orange),
-            const SizedBox(width: 8),
-            _statChip('Completed', '$completed', Colors.green),
-            const SizedBox(width: 8),
-            _statChip('Pending', '$pending', const Color(0xFF718096)),
-          ]),
-        ),
-        Expanded(
-          child: _filtered.isEmpty
-            ? const Center(child: Text('No services found.', style: TextStyle(color: Color(0xFF718096))))
-            : ListView.separated(
-                padding: const EdgeInsets.all(16),
-                itemCount: _filtered.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (_, i) => _serviceCard(_filtered[i]),
-              ),
-        ),
-      ]),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: _db.orderBy('createdAt', descending: true).snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+
+          final docs = snapshot.data?.docs ?? [];
+          final services = docs.map((d) {
+            final data = d.data() as Map<String, dynamic>;
+            return {
+              'docId': d.id,
+              'id': data['id'] as String? ?? d.id,
+              'plate': data['plate'] as String? ?? '',
+              'desc': data['desc'] as String? ?? '',
+              'mechanic': data['mechanic'] as String? ?? '',
+              'date': data['date'] as String? ?? '',
+              'cost': data['cost'] as String? ?? '₱0',
+              'status': data['status'] as String? ?? 'Pending',
+              'svcRows': data['svcRows'],
+              'matRows': data['matRows'],
+            };
+          }).toList();
+
+          final filtered = _searchQuery.isEmpty
+              ? services
+              : services.where((s) =>
+                  (s['id'] as String).toLowerCase().contains(_searchQuery) ||
+                  (s['plate'] as String).toLowerCase().contains(_searchQuery) ||
+                  (s['mechanic'] as String).toLowerCase().contains(_searchQuery)).toList();
+
+          final total = services.length;
+          final ongoing = services.where((s) => s['status'] == 'Ongoing').length;
+          final completed = services.where((s) => s['status'] == 'Completed').length;
+          final pending = services.where((s) => s['status'] == 'Pending').length;
+
+          return Column(children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: Row(children: [
+                _statChip('Total', '$total', Colors.blue),
+                const SizedBox(width: 8),
+                _statChip('Ongoing', '$ongoing', Colors.orange),
+                const SizedBox(width: 8),
+                _statChip('Completed', '$completed', Colors.green),
+                const SizedBox(width: 8),
+                _statChip('Pending', '$pending', const Color(0xFF718096)),
+              ]),
+            ),
+            Expanded(
+              child: filtered.isEmpty
+                ? const Center(child: Text('No services found.', style: TextStyle(color: Color(0xFF718096))))
+                : ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (_, i) => _serviceCard(filtered[i]),
+                  ),
+            ),
+          ]);
+        },
+      ),
     );
   }
 
@@ -170,8 +203,8 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
     );
   }
 
-  Widget _serviceCard(Map<String, String> s) {
-    final sc = _statusColor(s['status']!);
+  Widget _serviceCard(Map<String, dynamic> s) {
+    final sc = _statusColor(s['status'] as String);
     return GestureDetector(
       onTap: () => _showServiceDetails(s),
       child: Container(
@@ -184,17 +217,18 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
             child: const Icon(Icons.build_outlined, color: _red, size: 22)),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(s['plate']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-            Text(s['desc']!.isNotEmpty ? s['desc']! : s['plate']!, style: const TextStyle(fontSize: 12, color: Color(0xFF4a5568))),
+            Text(s['plate'] as String, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            Text((s['desc'] as String).isNotEmpty ? s['desc'] as String : s['plate'] as String,
+              style: const TextStyle(fontSize: 12, color: Color(0xFF4a5568))),
             Text('${s['mechanic']} • ${s['date']}', style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
           ])),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text(s['cost']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            Text(s['cost'] as String, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
             const SizedBox(height: 4),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(color: sc.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-              child: Text(s['status']!, style: TextStyle(fontSize: 10, color: sc, fontWeight: FontWeight.w600)),
+              child: Text(s['status'] as String, style: TextStyle(fontSize: 10, color: sc, fontWeight: FontWeight.w600)),
             ),
           ]),
           PopupMenuButton<String>(
@@ -214,8 +248,8 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
     );
   }
 
-  void _showServiceDetails(Map<String, String> s) {
-    final sc = _statusColor(s['status']!);
+  void _showServiceDetails(Map<String, dynamic> s) {
+    final sc = _statusColor(s['status'] as String);
     showModalBottomSheet(
       context: context, isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
@@ -228,14 +262,14 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
               width: double.infinity,
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
               decoration: const BoxDecoration(color: _red, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-              child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+              child: Row(children: [
                 Container(width: 44, height: 44,
                   decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(12)),
                   child: const Icon(Icons.build_outlined, color: Colors.white, size: 22)),
                 const SizedBox(width: 12),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(s['plate']!, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                  Text(s['desc'] ?? '', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                  Text(s['plate'] as String, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  Text(s['desc'] as String, style: const TextStyle(color: Colors.white70, fontSize: 12)),
                 ])),
                 GestureDetector(onTap: () => Navigator.pop(context),
                   child: const Icon(Icons.close, color: Colors.white)),
@@ -244,20 +278,34 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
             Padding(
               padding: const EdgeInsets.all(20),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                _detailRow('Plate Number', s['plate'] ?? '—'),
-                _detailRow('Mechanic', s['mechanic'] ?? '—'),
-                _detailRow('Date Serviced', s['date'] ?? '—'),
-                _detailRow('Total Cost', s['cost'] ?? '—'),
+                _detailRow('Plate Number', s['plate'] as String),
+                _detailRow('Mechanic', s['mechanic'] as String),
+                _detailRow('Date Serviced', s['date'] as String),
+                _detailRow('Total Cost', s['cost'] as String),
                 Row(children: [
                   const SizedBox(width: 130, child: Text('Status', style: TextStyle(fontSize: 12, color: Color(0xFF718096), fontWeight: FontWeight.w500))),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(color: sc.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-                    child: Text(s['status']!, style: TextStyle(fontSize: 12, color: sc, fontWeight: FontWeight.w600)),
+                    child: Text(s['status'] as String, style: TextStyle(fontSize: 12, color: sc, fontWeight: FontWeight.w600)),
                   ),
                 ]),
                 const SizedBox(height: 16),
-                if (s['status'] == 'Pending') ...[
+                // Services Rendered
+                if ((s['svcRows'] as List?)?.isNotEmpty == true) ...[
+                  const Text('Services Rendered', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF4a5568))),
+                  const SizedBox(height: 8),
+                  ...(s['svcRows'] as List).where((r) => (r['name'] as String? ?? '').isNotEmpty).map((r) => _rowDetailCard(r, isService: true)),
+                  const SizedBox(height: 12),
+                ],
+                // Materials Used
+                if ((s['matRows'] as List?)?.isNotEmpty == true) ...[
+                  const Text('Materials Used', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF4a5568))),
+                  const SizedBox(height: 8),
+                  ...(s['matRows'] as List).where((r) => (r['name'] as String? ?? '').isNotEmpty).map((r) => _rowDetailCard(r, isService: false)),
+                  const SizedBox(height: 12),
+                ],
+                if (s['status'] == 'Pending')
                   SizedBox(width: double.infinity,
                     child: ElevatedButton.icon(
                       onPressed: () async {
@@ -265,34 +313,35 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
                           context: context,
                           builder: (_) => AlertDialog(
                             title: const Text('Approve Service'),
-                            content: Text('Approve "${s['plate']}" and set status to Ongoing?'),
+                            content: Text('Approve service for ${s['plate']} and set status to Ongoing?'),
                             actions: [
                               TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-                              TextButton(
-                                onPressed: () => Navigator.pop(context, true),
-                                child: const Text('Approve', style: TextStyle(color: Colors.orange)),
-                              ),
+                              TextButton(onPressed: () => Navigator.pop(context, true),
+                                child: const Text('Approve', style: TextStyle(color: Colors.orange))),
                             ],
                           ),
                         );
-                        if (confirm == true) {
-                          setState(() {
-                            final idx = _services.indexWhere((e) => e['id'] == s['id']);
-                            if (idx != -1) {
-                              _services[idx] = Map.from(_services[idx])..['status'] = 'Ongoing';
-                              _filtered = List.from(_services);
-                            }
-                            s['status'] = 'Ongoing';
-                          });
-                          Navigator.pop(context);
+                        if (confirm != true) return;
+                        await _db.doc(s['docId'] as String).update({'status': 'Ongoing'});
+                        final plate = (s['plate'] as String).trim().toUpperCase();
+                        var vSnap = await FirebaseFirestore.instance
+                            .collection('vehicles').where('plate', isEqualTo: plate).limit(1).get();
+                        if (vSnap.docs.isEmpty) {
+                          final allVehicles = await FirebaseFirestore.instance.collection('vehicles').get();
+                          final match = allVehicles.docs.where((d) =>
+                            (d['plate'] as String? ?? '').toUpperCase() == plate).toList();
+                          if (match.isNotEmpty) {
+                            await match.first.reference.update({'status': 'Under Maintenance'});
+                          }
+                        } else {
+                          await vSnap.docs.first.reference.update({'status': 'Under Maintenance'});
                         }
+                        if (mounted) Navigator.pop(context);
                       },
                       icon: const Icon(Icons.check_circle_outline, size: 16),
-                      label: const Text('Approve'),
+                      label: const Text('Approve → Ongoing'),
                       style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white),
                     )),
-                  const SizedBox(height: 8),
-                ],
                 if (s['status'] == 'Ongoing') ...[
                   SizedBox(width: double.infinity,
                     child: ElevatedButton.icon(
@@ -301,27 +350,127 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
                           context: context,
                           builder: (_) => AlertDialog(
                             title: const Text('Complete Service'),
-                            content: Text('Mark "${s['plate']}" as Completed?'),
+                            content: Text('Mark service for ${s['plate']} as Completed?'),
                             actions: [
                               TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-                              TextButton(
-                                onPressed: () => Navigator.pop(context, true),
-                                child: const Text('Complete', style: TextStyle(color: Colors.green)),
-                              ),
+                              TextButton(onPressed: () => Navigator.pop(context, true),
+                                child: const Text('Complete', style: TextStyle(color: Colors.green))),
                             ],
                           ),
                         );
-                        if (confirm == true) {
-                          setState(() {
-                            final idx = _services.indexWhere((e) => e['id'] == s['id']);
-                            if (idx != -1) {
-                              _services[idx] = Map.from(_services[idx])..['status'] = 'Completed';
-                              _filtered = List.from(_services);
-                            }
-                            s['status'] = 'Completed';
+                        if (confirm != true) return;
+                        await _db.doc(s['docId'] as String).update({'status': 'Completed'});
+
+                        // Auto-create issuances + deduct stock for each material row
+                        final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+                        final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+                        final byName = (userDoc.data()?['name'] as String?) ?? 'Admin';
+                        final now = DateTime.now();
+                        final dateStr = '${now.month}/${now.day}/${now.year}';
+                        final plate = (s['plate'] as String).trim().toUpperCase();
+
+                        final matRows = s['matRows'] as List<dynamic>? ?? [];
+                        for (final r in matRows) {
+                          final name = r['name'] as String? ?? '';
+                          final qty = int.tryParse(r['qty'] as String? ?? '1') ?? 1;
+                          final uom = r['uom'] as String? ?? '';
+                          final cost = double.tryParse(r['cost'] as String? ?? '0') ?? 0;
+                          if (name.isEmpty || qty <= 0) continue;
+
+                          // Look up item master for num/group
+                          final iSnap = await FirebaseFirestore.instance
+                              .collection('item_master').where('name', isEqualTo: name).limit(1).get();
+                          final iData = iSnap.docs.isNotEmpty ? iSnap.docs.first.data() as Map<String, dynamic> : <String, dynamic>{};
+
+                          // Create issuance record
+                          await FirebaseFirestore.instance.collection('issuances').add({
+                            'id': 'ISS-AUTO-${DateTime.now().millisecondsSinceEpoch}',
+                            'date': dateStr,
+                            'plate': plate,
+                            'assetDesc': s['desc'] ?? '',
+                            'itemNum': iData['num'] ?? '',
+                            'itemName': name,
+                            'itemType': 'Material',
+                            'commodityGroup': iData['group'] ?? '',
+                            'uom': uom,
+                            'qty': '$qty',
+                            'unitCost': cost.toStringAsFixed(2),
+                            'subtotal': (cost * qty).toStringAsFixed(2),
+                            'createdBy': byName,
+                            'maintenanceId': s['id'],
+                            'createdAt': FieldValue.serverTimestamp(),
                           });
-                          Navigator.pop(context);
+
+                          // Deduct from stock_inventory
+                          final stockSnap = await FirebaseFirestore.instance
+                              .collection('stock_inventory').where('name', isEqualTo: name).limit(1).get();
+                          if (stockSnap.docs.isNotEmpty) {
+                            final stockDoc = stockSnap.docs.first;
+                            final currentStock = (stockDoc['stock'] as num?)?.toInt() ?? 0;
+                            final newStock = (currentStock - qty).clamp(0, 99999);
+                            final minLevel = (stockDoc['min'] as num?)?.toInt() ?? 0;
+                            await stockDoc.reference.update({
+                              'stock': newStock,
+                              'status': newStock >= minLevel ? 'OK' : 'Low',
+                              'updatedAt': FieldValue.serverTimestamp(),
+                            });
+                          }
+
+                          // Log OUT transaction
+                          await FirebaseFirestore.instance.collection('transactions').add({
+                            'item': name,
+                            'desc': 'Issued for maintenance ${s['id']} — $plate',
+                            'type': 'OUT',
+                            'qty': '-$qty',
+                            'date': dateStr,
+                            'by': byName,
+                            'createdAt': FieldValue.serverTimestamp(),
+                          });
                         }
+
+                        // Also create issuance records for service rows
+                        final svcRows = s['svcRows'] as List<dynamic>? ?? [];
+                        for (final r in svcRows) {
+                          final name = r['name'] as String? ?? '';
+                          final qty = int.tryParse(r['qty'] as String? ?? '1') ?? 1;
+                          final uom = r['uom'] as String? ?? '';
+                          final cost = double.tryParse(r['cost'] as String? ?? '0') ?? 0;
+                          if (name.isEmpty) continue;
+
+                          final iSnap = await FirebaseFirestore.instance
+                              .collection('item_master').where('name', isEqualTo: name).limit(1).get();
+                          final iData = iSnap.docs.isNotEmpty ? iSnap.docs.first.data() as Map<String, dynamic> : <String, dynamic>{};
+
+                          await FirebaseFirestore.instance.collection('issuances').add({
+                            'id': 'ISS-AUTO-${DateTime.now().millisecondsSinceEpoch}-S',
+                            'date': dateStr,
+                            'plate': plate,
+                            'assetDesc': s['desc'] ?? '',
+                            'itemNum': iData['num'] ?? '',
+                            'itemName': name,
+                            'itemType': 'Service',
+                            'commodityGroup': iData['group'] ?? '',
+                            'uom': uom,
+                            'qty': '$qty',
+                            'unitCost': cost.toStringAsFixed(2),
+                            'subtotal': (cost * qty).toStringAsFixed(2),
+                            'createdBy': byName,
+                            'maintenanceId': s['id'],
+                            'createdAt': FieldValue.serverTimestamp(),
+                          });
+                        }
+
+                        // Update vehicle status + last service date
+                        final vSnap = await FirebaseFirestore.instance
+                            .collection('vehicles').where('plate', isEqualTo: plate).limit(1).get();
+                        if (vSnap.docs.isNotEmpty) {
+                          await vSnap.docs.first.reference.update({
+                            'status': 'Completed',
+                            'completedAt': FieldValue.serverTimestamp(),
+                            'lastSvcDate': '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}',
+                          });
+                        }
+                        if (mounted) Navigator.pop(context);
                       },
                       icon: const Icon(Icons.done_all, size: 16),
                       label: const Text('Mark as Completed'),
@@ -344,28 +493,54 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
     );
   }
 
-  Widget _detailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        SizedBox(width: 130, child: Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF718096), fontWeight: FontWeight.w500))),
-        Expanded(child: Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1a202c)))),
+  Widget _rowDetailCard(dynamic r, {required bool isService}) {
+    final name = r['name'] as String? ?? '';
+    final qty = r['qty'] as String? ?? '1';
+    final uom = r['uom'] as String? ?? '';
+    final cost = r['cost'] as String? ?? '0';
+    final subtotal = (double.tryParse(cost) ?? 0) * (double.tryParse(qty) ?? 1);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isService ? const Color(0xFFebf8ff) : const Color(0xFFF0F4FF),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: isService ? const Color(0xFF90cdf4) : const Color(0xFFbee3f8)),
+      ),
+      child: Row(children: [
+        Icon(isService ? Icons.build_outlined : Icons.inventory_2_outlined,
+          size: 16, color: isService ? const Color(0xFF003087) : _red),
+        const SizedBox(width: 8),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+          Text('$qty $uom  •  ₱$cost / unit', style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
+        ])),
+        Text('₱${subtotal.toStringAsFixed(2)}',
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1a202c))),
       ]),
     );
   }
 
-  void _showAddServiceModal({Map<String, String>? service}) {
+  Widget _detailRow(String label, String value) {    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        SizedBox(width: 130, child: Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF718096), fontWeight: FontWeight.w500))),
+        Expanded(child: Text(value.isNotEmpty ? value : '—', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1a202c)))),
+      ]),
+    );
+  }
+
+  void _showAddServiceModal({Map<String, dynamic>? service}) async {
     final isEdit = service != null;
-    final plateCtrl = TextEditingController(text: service?['plate'] ?? '');
-    final mechanicCtrl = TextEditingController(text: service?['mechanic'] ?? '');
-    final dateCtrl = TextEditingController(text: service?['date'] ?? '');
+    final plateCtrl = TextEditingController(text: service?['plate'] as String? ?? '');
+    final mechanicCtrl = TextEditingController(text: service?['mechanic'] as String? ?? '');
+    final dateCtrl = TextEditingController(text: service?['date'] as String? ?? '');
 
-    Map<String, String>? foundVehicle = isEdit ? _vehicles[service!['plate']] : null;
+    Map<String, dynamic>? foundVehicle = isEdit ? _vehicleMap[service!['plate']] : null;
 
-    // Pre-populate rows from saved data when editing
-    List<Map<String, TextEditingController>> _makeRows(List<Map<String, String>>? saved) {
+    List<Map<String, TextEditingController>> makeRows(List<dynamic>? saved) {
       if (saved != null && saved.isNotEmpty) {
-        return saved.map((r) => {
+        return saved.map<Map<String, TextEditingController>>((r) => {
           'name': TextEditingController(text: r['name'] ?? ''),
           'qty':  TextEditingController(text: r['qty']  ?? ''),
           'uom':  TextEditingController(text: r['uom']  ?? ''),
@@ -375,9 +550,8 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
       return [{'name': TextEditingController(), 'qty': TextEditingController(), 'uom': TextEditingController(), 'cost': TextEditingController()}];
     }
 
-    final String? editId = service?['id'];
-    final List<Map<String, TextEditingController>> svcRows = _makeRows(isEdit ? _svcRowsData[editId] : null);
-    final List<Map<String, TextEditingController>> matRows = _makeRows(isEdit ? _matRowsData[editId] : null);
+    final svcRows = makeRows(service?['svcRows'] as List<dynamic>?);
+    final matRows = makeRows(service?['matRows'] as List<dynamic>?);
 
     showModalBottomSheet(
       context: context, isScrollControlled: true,
@@ -387,7 +561,7 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
           double totalCost() {
             double t = 0;
             for (final r in [...svcRows, ...matRows]) {
-              t += (double.tryParse(r['cost']!.text) ?? 0) * (double.tryParse(r['qty']!.text) ?? 0);
+              t += (double.tryParse(r['cost']!.text) ?? 0) * (double.tryParse(r['qty']!.text) ?? 1);
             }
             return t;
           }
@@ -401,7 +575,7 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
                   width: double.infinity,
                   padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
                   decoration: const BoxDecoration(color: _red, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-                  child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                  child: Row(children: [
                     Container(width: 44, height: 44,
                       decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(12)),
                       child: Icon(isEdit ? Icons.edit_outlined : Icons.add, color: Colors.white, size: 22)),
@@ -418,28 +592,66 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     const Text('Plate Number *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF4a5568))),
                     const SizedBox(height: 6),
-                    TextField(
-                      controller: plateCtrl,
-                      textCapitalization: TextCapitalization.characters,
-                      onChanged: (v) => setModal(() => foundVehicle = _vehicles[v.trim().toUpperCase()]),
-                      decoration: InputDecoration(
-                        hintText: 'Type or scan plate number...',
-                        border: const OutlineInputBorder(),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        suffixIcon: IconButton(
-                          icon: const Icon(Icons.qr_code_scanner, color: Color(0xFF718096)),
-                          tooltip: 'Scan Plate Number',
-                          onPressed: () async {
-                            final result = await Navigator.push<String>(context,
-                              MaterialPageRoute(builder: (_) => const BarcodeScannerScreen(
-                                title: 'Scan Plate Number',
-                                hint: 'Point camera at the plate number',
-                              )));
-                            if (result != null) {
-                              plateCtrl.text = result.toUpperCase();
-                              setModal(() => foundVehicle = _vehicles[result.toUpperCase()]);
-                            }
-                          },
+                    Autocomplete<String>(
+                      initialValue: TextEditingValue(text: plateCtrl.text),
+                      optionsBuilder: (value) {
+                        final q = value.text.trim().toUpperCase();
+                        if (q.isEmpty) return _vehicleMap.keys;
+                        return _vehicleMap.keys.where((p) => p.contains(q));
+                      },
+                      onSelected: (plate) {
+                        plateCtrl.text = plate;
+                        setModal(() => foundVehicle = _vehicleMap[plate]);
+                      },
+                      fieldViewBuilder: (ctx, ctrl, focusNode, onSubmit) => TextField(
+                        controller: ctrl,
+                        focusNode: focusNode,
+                        textCapitalization: TextCapitalization.characters,
+                        onChanged: (v) => setModal(() => foundVehicle = _vehicleMap[v.trim().toUpperCase()]),
+                        decoration: InputDecoration(
+                          hintText: 'Search or scan plate number...',
+                          border: const OutlineInputBorder(),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          prefixIcon: const Icon(Icons.search, size: 20, color: Color(0xFF718096)),
+                          suffixIcon: IconButton(
+                            icon: const Icon(Icons.qr_code_scanner, color: Color(0xFF718096)),
+                            onPressed: () async {
+                              final result = await Navigator.push<String>(context,
+                                MaterialPageRoute(builder: (_) => const BarcodeScannerScreen()));
+                              if (result != null) {
+                                ctrl.text = result.toUpperCase();
+                                plateCtrl.text = result.toUpperCase();
+                                setModal(() => foundVehicle = _vehicleMap[result.toUpperCase()]);
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                      optionsViewBuilder: (ctx, onSelected, options) => Align(
+                        alignment: Alignment.topLeft,
+                        child: Material(
+                          elevation: 6,
+                          borderRadius: BorderRadius.circular(10),
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxHeight: 200),
+                            child: ListView.separated(
+                              padding: EdgeInsets.zero,
+                              shrinkWrap: true,
+                              itemCount: options.length,
+                              separatorBuilder: (_, __) => const Divider(height: 1),
+                              itemBuilder: (_, i) {
+                                final plate = options.elementAt(i);
+                                final v = _vehicleMap[plate];
+                                return ListTile(
+                                  dense: true,
+                                  leading: const Icon(Icons.directions_car_outlined, size: 18, color: Color(0xFF003087)),
+                                  title: Text(plate, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                  subtitle: Text(v?['desc'] as String? ?? '', style: const TextStyle(fontSize: 11)),
+                                  onTap: () => onSelected(plate),
+                                );
+                              },
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -450,12 +662,11 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
                         decoration: BoxDecoration(color: const Color(0xFFF0F4FF), borderRadius: BorderRadius.circular(10),
                           border: Border.all(color: const Color(0xFFbee3f8))),
                         child: Row(children: [
-                          const Icon(Icons.local_shipping_outlined, color: _red, size: 20),
+                          const Icon(Icons.directions_car_outlined, color: _red, size: 20),
                           const SizedBox(width: 10),
                           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text(foundVehicle!['desc']!, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                            Text('${foundVehicle!['owner']} • ${foundVehicle!['type']}',
-                              style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
+                            Text(foundVehicle!['desc'] as String? ?? '', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                            Text(foundVehicle!['owner'] as String? ?? '', style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
                           ])),
                         ]),
                       ),
@@ -464,7 +675,8 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
                     TextField(controller: mechanicCtrl,
                       decoration: const InputDecoration(labelText: 'Mechanic Name *', border: OutlineInputBorder())),
                     const SizedBox(height: 10),
-                    TextField(controller: dateCtrl,
+                    TextField(
+                      controller: dateCtrl,
                       readOnly: true,
                       decoration: InputDecoration(
                         labelText: 'Date Serviced *',
@@ -479,9 +691,7 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
                               firstDate: DateTime(2020),
                               lastDate: DateTime(2030),
                               builder: (c, child) => Theme(
-                                data: Theme.of(c).copyWith(
-                                  colorScheme: const ColorScheme.light(primary: _red),
-                                ),
+                                data: Theme.of(c).copyWith(colorScheme: const ColorScheme.light(primary: _red)),
                                 child: child!,
                               ),
                             );
@@ -503,7 +713,7 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
                         label: const Text('Add Row', style: TextStyle(fontSize: 12)),
                       ),
                     ]),
-                    ...svcRows.asMap().entries.map((e) => _itemRow(e.value, true, () => setModal(() => svcRows.removeAt(e.key)), setModal, ctx)),
+                    ...svcRows.asMap().entries.map((e) => _svcRow(e.value, () => setModal(() => svcRows.removeAt(e.key)), setModal)),
                     const SizedBox(height: 12),
                     // Materials Used
                     Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
@@ -514,7 +724,7 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
                         label: const Text('Add Row', style: TextStyle(fontSize: 12)),
                       ),
                     ]),
-                    ...matRows.asMap().entries.map((e) => _itemRow(e.value, false, () => setModal(() => matRows.removeAt(e.key)), setModal, ctx)),
+                    ...matRows.asMap().entries.map((e) => _matRow(e.value, () => setModal(() => matRows.removeAt(e.key)), setModal, ctx)),
                     const SizedBox(height: 12),
                     Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                       const Text('Total Cost:', style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF2c5282), fontSize: 14)),
@@ -526,41 +736,32 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
                       Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel'))),
                       const SizedBox(width: 12),
                       Expanded(child: ElevatedButton(
-                        onPressed: () {
-                          if (plateCtrl.text.trim().isEmpty) return;
-                          setState(() {
-                            final id = isEdit ? service!['id']! : 'SVC-${(_services.length + 1).toString().padLeft(3, '0')}';
-                            final newS = {
-                              'id': id,
-                              'plate': plateCtrl.text.trim().toUpperCase(),
-                              'desc': foundVehicle?['desc'] ?? '',
-                              'mechanic': mechanicCtrl.text.trim(),
-                              'date': dateCtrl.text.trim(),
-                              'cost': '₱${totalCost().toStringAsFixed(2)}',
-                              'status': isEdit ? service!['status']! : 'Pending',
-                            };
-                            // Save rows data
-                            _svcRowsData[id] = svcRows.map((r) => {
-                              'name': r['name']!.text,
-                              'qty':  r['qty']!.text,
-                              'uom':  r['uom']!.text,
-                              'cost': r['cost']!.text,
-                            }).toList();
-                            _matRowsData[id] = matRows.map((r) => {
-                              'name': r['name']!.text,
-                              'qty':  r['qty']!.text,
-                              'uom':  r['uom']!.text,
-                              'cost': r['cost']!.text,
-                            }).toList();
+                        onPressed: () async {
+                          if (plateCtrl.text.trim().isEmpty || mechanicCtrl.text.trim().isEmpty) return;
+                          final svcId = isEdit ? service!['id'] as String : await _nextSvcId();
+                          final data = <String, dynamic>{
+                            'id': svcId,
+                            'plate': plateCtrl.text.trim().toUpperCase(),
+                            'desc': foundVehicle?['desc'] as String? ?? '',
+                            'mechanic': mechanicCtrl.text.trim(),
+                            'date': dateCtrl.text.trim(),
+                            'cost': '₱${totalCost().toStringAsFixed(2)}',
+                            'status': isEdit ? service!['status'] as String : 'Pending',
+                            'svcRows': svcRows.map((r) => {'name': r['name']!.text, 'qty': r['qty']!.text, 'uom': r['uom']!.text, 'cost': r['cost']!.text}).toList(),
+                            'matRows': matRows.map((r) => {'name': r['name']!.text, 'qty': r['qty']!.text, 'uom': r['uom']!.text, 'cost': r['cost']!.text}).toList(),
+                          };
+                          try {
                             if (isEdit) {
-                              final idx = _services.indexWhere((e) => e['id'] == service!['id']);
-                              if (idx != -1) _services[idx] = newS;
+                              await _db.doc(service!['docId'] as String).update(data);
                             } else {
-                              _services.add(newS);
+                              data['createdAt'] = FieldValue.serverTimestamp();
+                              await _db.add(data);
                             }
-                            _filtered = List.from(_services);
-                          });
-                          Navigator.pop(context);
+                            if (context.mounted) Navigator.pop(context);
+                          } catch (e) {
+                            if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+                          }
                         },
                         style: ElevatedButton.styleFrom(backgroundColor: _red, foregroundColor: Colors.white),
                         child: Text(isEdit ? '💾 Update' : '💾 Save'),
@@ -576,29 +777,8 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
     );
   }
 
-  Widget _rowHeader() {
-    return const Padding(
-      padding: EdgeInsets.only(bottom: 4),
-      child: Row(children: [
-        Expanded(flex: 3, child: Text('Item', style: TextStyle(fontSize: 10, color: Color(0xFF718096), fontWeight: FontWeight.w600))),
-        SizedBox(width: 4),
-        SizedBox(width: 44, child: Text('Qty', style: TextStyle(fontSize: 10, color: Color(0xFF718096), fontWeight: FontWeight.w600))),
-        SizedBox(width: 4),
-        SizedBox(width: 44, child: Text('UOM', style: TextStyle(fontSize: 10, color: Color(0xFF718096), fontWeight: FontWeight.w600))),
-        SizedBox(width: 4),
-        SizedBox(width: 60, child: Text('Cost (₱)', style: TextStyle(fontSize: 10, color: Color(0xFF718096), fontWeight: FontWeight.w600))),
-        SizedBox(width: 28),
-      ]),
-    );
-  }
-
-  Widget _itemRow(Map<String, TextEditingController> row, bool isService, VoidCallback onRemove, StateSetter setModal, BuildContext ctx) {
-    if (!isService) return _materialRow(row, onRemove, setModal, ctx);
-
-    // Service row: dropdown with auto-fill + qty only
-    final isFound = row['name']!.text.isNotEmpty;
+  Widget _svcRow(Map<String, TextEditingController> row, VoidCallback onRemove, StateSetter setModal) {
     final currentVal = _serviceItems.contains(row['name']!.text) ? row['name']!.text : null;
-
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -607,62 +787,31 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
             value: currentVal,
             hint: const Text('Select service...', style: TextStyle(fontSize: 11)),
             isExpanded: true,
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-              contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-              isDense: true,
-            ),
-            items: _serviceItems.map((s) => DropdownMenuItem(
-              value: s,
-              child: Text(s, style: const TextStyle(fontSize: 12)),
-            )).toList(),
+            decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10), isDense: true),
+            items: _serviceItems.map((s) => DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontSize: 12)))).toList(),
             onChanged: (v) {
               if (v != null) {
                 row['name']!.text = v;
-                final data = _serviceItemData[v];
-                row['uom']!.text = data?['uom'] ?? 'job';
-                row['cost']!.text = data?['cost'] ?? '0';
+                final d = _itemMasterMap[v];
+                row['uom']!.text = d?['uom'] as String? ?? 'job';
+                row['cost']!.text = (d?['cost'] as String? ?? '0').replaceAll('₱', '');
+                if (row['qty']!.text.isEmpty) row['qty']!.text = '1';
               }
               setModal(() {});
             },
           )),
-          SizedBox(width: 32, child: IconButton(
-            icon: const Icon(Icons.close, size: 16, color: Colors.red),
-            padding: EdgeInsets.zero,
-            onPressed: onRemove,
-          )),
+          SizedBox(width: 32, child: IconButton(icon: const Icon(Icons.close, size: 16, color: Colors.red), padding: EdgeInsets.zero, onPressed: onRemove)),
         ]),
-        if (isFound) ...[
+        if (row['name']!.text.isNotEmpty) ...[
           const SizedBox(height: 6),
           Container(
             padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFebf8ff),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFF90cdf4)),
-            ),
+            decoration: BoxDecoration(color: const Color(0xFFebf8ff), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFF90cdf4))),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                const Icon(Icons.build_outlined, size: 16, color: Color(0xFF003087)),
-                const SizedBox(width: 6),
-                Expanded(child: Text(row['name']!.text,
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12))),
-              ]),
-              const SizedBox(height: 4),
-              Text('UOM: ${row['uom']!.text}  •  Unit Cost: ₱${row['cost']!.text}',
-                style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
+              Text('UOM: ${row['uom']!.text}  •  Unit Cost: ₱${row['cost']!.text}', style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
               const SizedBox(height: 8),
-              TextField(
-                controller: row['qty'],
-                keyboardType: TextInputType.number,
-                onChanged: (_) => setModal(() {}),
-                decoration: const InputDecoration(
-                  labelText: 'Quantity *',
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  isDense: true,
-                ),
-              ),
+              TextField(controller: row['qty'], keyboardType: TextInputType.number, onChanged: (_) => setModal(() {}),
+                decoration: const InputDecoration(labelText: 'Quantity *', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8), isDense: true)),
             ]),
           ),
         ],
@@ -670,37 +819,28 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
     );
   }
 
-  Widget _materialRow(Map<String, TextEditingController> row, VoidCallback onRemove, StateSetter setModal, BuildContext ctx) {
+  Widget _matRow(Map<String, TextEditingController> row, VoidCallback onRemove, StateSetter setModal, BuildContext ctx) {
     final scanCtrl = TextEditingController();
-
     void lookup(String query) {
       final q = query.trim().toLowerCase();
       if (q.isEmpty) return;
-      for (final entry in _itemMasterData.entries) {
+      for (final entry in _itemMasterMap.entries) {
         final d = entry.value;
-        if (entry.key.toLowerCase().contains(q) ||
-            d['barcode'] == query.trim() ||
-            d['qr'] == query.trim()) {
+        if (entry.key.toLowerCase().contains(q) || d['barcode'] == query.trim() || d['qr'] == query.trim()) {
           row['name']!.text = entry.key;
-          row['uom']!.text = d['uom']!;
-          row['cost']!.text = d['cost']!;
-          setModal(() {});
-          return;
+          row['uom']!.text = d['uom'] as String? ?? '';
+          row['cost']!.text = (d['cost'] as String? ?? '0').replaceAll('₱', '');
+          if (row['qty']!.text.isEmpty) row['qty']!.text = '1';
+          setModal(() {}); return;
         }
       }
-      // Not found — clear
-      row['name']!.text = '';
-      row['uom']!.text = '';
-      row['cost']!.text = '';
+      row['name']!.text = ''; row['uom']!.text = ''; row['cost']!.text = '';
       setModal(() {});
     }
-
-    final isFound = row['name']!.text.isNotEmpty;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Scan/search field
         Row(children: [
           Expanded(child: TextField(
             controller: scanCtrl,
@@ -711,92 +851,61 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
               contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
               isDense: true,
               suffixIcon: Row(mainAxisSize: MainAxisSize.min, children: [
-                IconButton(
-                  icon: const Icon(Icons.search, size: 18, color: Color(0xFF718096)),
-                  padding: EdgeInsets.zero,
-                  tooltip: 'Search',
-                  onPressed: () => lookup(scanCtrl.text),
-                ),
+                IconButton(icon: const Icon(Icons.search, size: 18, color: Color(0xFF718096)), padding: EdgeInsets.zero, onPressed: () => lookup(scanCtrl.text)),
                 IconButton(
                   icon: const Icon(Icons.qr_code_scanner, size: 18, color: Color(0xFF003087)),
                   padding: EdgeInsets.zero,
-                  tooltip: 'Scan',
                   onPressed: () async {
-                    final result = await Navigator.push<String>(
-                      ctx,
-                      MaterialPageRoute(builder: (_) => const BarcodeScannerScreen()),
-                    );
-                    if (result != null) {
-                      scanCtrl.text = result;
-                      lookup(result);
-                    }
+                    final result = await Navigator.push<String>(ctx, MaterialPageRoute(builder: (_) => const BarcodeScannerScreen()));
+                    if (result != null) { scanCtrl.text = result; lookup(result); }
                   },
                 ),
               ]),
             ),
             onSubmitted: lookup,
           )),
-          SizedBox(width: 32, child: IconButton(
-            icon: const Icon(Icons.close, size: 16, color: Colors.red),
-            padding: EdgeInsets.zero,
-            onPressed: onRemove,
-          )),
+          SizedBox(width: 32, child: IconButton(icon: const Icon(Icons.close, size: 16, color: Colors.red), padding: EdgeInsets.zero, onPressed: onRemove)),
         ]),
-        // Found item details + qty
-        if (isFound) ...[
+        if (row['name']!.text.isNotEmpty) ...[
           const SizedBox(height: 6),
           Container(
             padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFebf8ff),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFF90cdf4)),
-            ),
+            decoration: BoxDecoration(color: const Color(0xFFebf8ff), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFF90cdf4))),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
                 const Icon(Icons.inventory_2_outlined, size: 16, color: Color(0xFF003087)),
                 const SizedBox(width: 6),
-                Expanded(child: Text(row['name']!.text,
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
-                GestureDetector(
-                  onTap: () {
-                    row['name']!.text = '';
-                    row['uom']!.text = '';
-                    row['cost']!.text = '';
-                    scanCtrl.clear();
-                    setModal(() {});
-                  },
-                  child: const Icon(Icons.close, size: 14, color: Color(0xFF718096)),
-                ),
+                Expanded(child: Text(row['name']!.text, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
+                GestureDetector(onTap: () { row['name']!.text = ''; row['uom']!.text = ''; row['cost']!.text = ''; scanCtrl.clear(); setModal(() {}); },
+                  child: const Icon(Icons.close, size: 14, color: Color(0xFF718096))),
               ]),
               const SizedBox(height: 4),
-              Text('UOM: ${row['uom']!.text}  •  Unit Cost: ₱${row['cost']!.text}',
-                style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
+              Text('UOM: ${row['uom']!.text}  •  Unit Cost: ₱${row['cost']!.text}', style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
               const SizedBox(height: 8),
-              TextField(
-                controller: row['qty'],
-                keyboardType: TextInputType.number,
-                onChanged: (_) => setModal(() {}),
-                decoration: const InputDecoration(
-                  labelText: 'Quantity *',
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  isDense: true,
-                ),
-              ),
+              TextField(controller: row['qty'], keyboardType: TextInputType.number, onChanged: (_) => setModal(() {}),
+                decoration: const InputDecoration(labelText: 'Quantity *', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8), isDense: true)),
             ]),
           ),
-        ] else if (scanCtrl.text.isNotEmpty) ...[
-          const SizedBox(height: 4),
-          const Text('No item found for that code.', style: TextStyle(fontSize: 11, color: Colors.red)),
         ],
       ]),
     );
   }
 
+  String _computeVehicleStatus(String lastSvcDate, String svcFreq) {
+    if (lastSvcDate.isEmpty || svcFreq.isEmpty) return 'Active';
+    final date = DateTime.tryParse(lastSvcDate);
+    final months = int.tryParse(svcFreq);
+    if (date == null || months == null) return 'Active';
+    final nextPms = DateTime(date.year, date.month + months, date.day);
+    final daysUntil = nextPms.difference(DateTime.now()).inDays;
+    if (daysUntil < 0) return 'Overdue';
+    if (daysUntil <= 30) return 'PMS Due Soon';
+    return 'Active';
+  }
+
   String _monthName(int m) => const ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m - 1];
 
-  void _confirmDelete(Map<String, String> s) {
+  void _confirmDelete(Map<String, dynamic> s) {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -805,12 +914,14 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           TextButton(
-            onPressed: () {
-              setState(() {
-                _services.removeWhere((e) => e['id'] == s['id']);
-                _filtered = List.from(_services);
-              });
+            onPressed: () async {
               Navigator.pop(context);
+              try {
+                await _db.doc(s['docId'] as String).delete();
+              } catch (e) {
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+              }
             },
             child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),

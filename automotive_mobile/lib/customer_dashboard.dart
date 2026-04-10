@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'login.dart';
-import 'customer_pms.dart';
+import 'customer_pms_history.dart';
 import 'profile.dart';
 
 class CustomerDashboard extends StatefulWidget {
@@ -182,38 +182,80 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
 
   // ── MY VEHICLES ──
   Widget _buildVehicles() {
-    final vehicles = [
-      {'plate': 'ABC-1234', 'desc': 'Isuzu Truck NQR 2021', 'type': 'truck', 'status': 'Good', 'lastSvc': 'Mar 15, 2026', 'odo': '45,000 km', 'pms': 'Due in 2 months'},
-      {'plate': 'XYZ-5678', 'desc': 'Toyota Hilux 2020', 'type': 'car', 'status': 'Maintenance', 'lastSvc': 'Mar 20, 2026', 'odo': '32,000 km', 'pms': 'Under maintenance'},
-      {'plate': 'DEF-9012', 'desc': 'Mitsubishi L300 2019', 'type': 'truck', 'status': 'Overdue', 'lastSvc': 'Jan 10, 2026', 'odo': '78,000 km', 'pms': 'PMS Overdue'},
-    ];
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('vehicles')
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Stats grid
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 1.4,
-            children: [
-              _miniStat('Total Vehicles', '3', Icons.directions_car_outlined, _red),
-              _miniStat('Maintenance', '1', Icons.build_outlined, Colors.orange),
-              _miniStat('PMS Overdue', '1', Icons.warning_amber_outlined, Colors.red),
-              _miniStat('Due Soon', '1', Icons.schedule_outlined, Colors.amber),
-            ],
-          ),
-          const SizedBox(height: 20),
-          const Text('My Fleet', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1a202c))),
-          const SizedBox(height: 12),
-          ...vehicles.map((v) => _vehicleCard(v)),
-        ],
-      ),
+        final uid = FirebaseAuth.instance.currentUser?.uid;
+        final allDocs = snapshot.data?.docs ?? [];
+
+        // Filter vehicles owned by this customer (match by owner name)
+        // We'll match by owner field after loading user name
+        return FutureBuilder<DocumentSnapshot>(
+          future: uid != null
+              ? FirebaseFirestore.instance.collection('users').doc(uid).get()
+              : Future.value(null),
+          builder: (context, userSnap) {
+            final userName = (userSnap.data?.data() as Map<String, dynamic>?)?['name'] as String? ?? '';
+
+            final vehicles = allDocs
+                .where((d) {
+                  final data = d.data() as Map<String, dynamic>;
+                  final owner = data['owner'] as String? ?? '';
+                  return owner.toLowerCase() == userName.toLowerCase();
+                })
+                .map((d) {
+                  final data = d.data() as Map<String, dynamic>;
+                  return {
+                    'id': d.id,
+                    'plate': data['plate'] as String? ?? '',
+                    'desc': data['desc'] as String? ?? '',
+                    'type': data['type'] as String? ?? '',
+                    'status': data['status'] as String? ?? 'Active',
+                    'lastSvcDate': data['lastSvcDate'] as String? ?? '',
+                    'odo': data['odo'] as String? ?? '',
+                    'svcFreq': data['svcFreq'] as String? ?? '',
+                  };
+                }).toList();
+
+            final maint = vehicles.where((v) => v['status'] == 'Under Maintenance').length;
+            final overdue = vehicles.where((v) => v['status'] == 'Overdue').length;
+            final dueSoon = vehicles.where((v) => v['status'] == 'PMS Due Soon').length;
+
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                GridView.count(
+                  crossAxisCount: 2, shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 1.4,
+                  children: [
+                    _miniStat('Total Vehicles', '${vehicles.length}', Icons.directions_car_outlined, _red),
+                    _miniStat('Maintenance', '$maint', Icons.build_outlined, Colors.orange),
+                    _miniStat('PMS Overdue', '$overdue', Icons.warning_amber_outlined, Colors.red),
+                    _miniStat('Due Soon', '$dueSoon', Icons.schedule_outlined, Colors.amber),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                const Text('My Fleet', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1a202c))),
+                const SizedBox(height: 12),
+                if (vehicles.isEmpty)
+                  const Center(child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Text('No vehicles registered under your name.', style: TextStyle(color: Color(0xFF718096))),
+                  ))
+                else
+                  ...vehicles.map((v) => _vehicleCard(v)),
+              ]),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -243,9 +285,17 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
   }
 
   Widget _vehicleCard(Map<String, String> v) {
-    final statusColor = v['status'] == 'Good' ? Colors.green
-        : v['status'] == 'Maintenance' ? Colors.orange : Colors.red;
-    final isTruck = v['type'] == 'truck';
+    final status = v['status'] ?? 'Active';
+    final statusColor = status == 'Active' ? Colors.green
+        : status == 'Under Maintenance' ? Colors.orange
+        : status == 'Overdue' ? Colors.red
+        : status == 'PMS Due Soon' ? Colors.amber.shade700
+        : Colors.grey;
+    final statusLabel = status == 'Active' ? 'Good'
+        : status == 'Under Maintenance' ? 'Under Maintenance'
+        : status == 'Overdue' ? 'PMS Overdue'
+        : status == 'PMS Due Soon' ? 'Due Soon'
+        : status;
 
     return GestureDetector(
       onTap: () => _showVehicleHistory(v),
@@ -257,14 +307,13 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 3))],
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // ── Top section ──
           Padding(
             padding: const EdgeInsets.all(16),
             child: Row(children: [
               Container(
                 width: 52, height: 52,
                 decoration: BoxDecoration(color: _red.withOpacity(0.08), borderRadius: BorderRadius.circular(14)),
-                child: Icon(isTruck ? Icons.local_shipping_outlined : Icons.directions_car_outlined, color: _red, size: 26),
+                child: const Icon(Icons.directions_car_outlined, color: _red, size: 26),
               ),
               const SizedBox(width: 14),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -275,7 +324,6 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
               const Icon(Icons.chevron_right, color: Color(0xFFcbd5e0), size: 20),
             ]),
           ),
-          // ── Bottom info strip ──
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
@@ -284,14 +332,14 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
               border: Border(top: BorderSide(color: Colors.grey.shade100)),
             ),
             child: Row(children: [
-              _infoChip(Icons.speed_outlined, v['odo']!),
+              _infoChip(Icons.speed_outlined, v['odo']!.isNotEmpty ? v['odo']! : '—'),
               _stripDivider(),
-              _infoChip(Icons.calendar_today_outlined, v['lastSvc']!),
+              _infoChip(Icons.calendar_today_outlined, v['lastSvcDate']!.isNotEmpty ? v['lastSvcDate']! : '—'),
               _stripDivider(),
               Row(children: [
                 Container(width: 6, height: 6, decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle)),
                 const SizedBox(width: 4),
-                Text(v['pms']!, style: TextStyle(fontSize: 10, color: statusColor, fontWeight: FontWeight.w600)),
+                Text(statusLabel, style: TextStyle(fontSize: 10, color: statusColor, fontWeight: FontWeight.w600)),
               ]),
             ]),
           ),
@@ -314,84 +362,120 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
   }
 
   void _showVehicleHistory(Map<String, String> v) {
-    final isTruck = v['type'] == 'truck';
-    final statusColor = v['status'] == 'Good' ? Colors.green
-        : v['status'] == 'Maintenance' ? Colors.orange : Colors.red;
+    final status = v['status'] ?? 'Active';
+    final statusColor = status == 'Active' ? Colors.green
+        : status == 'Under Maintenance' ? Colors.orange
+        : status == 'Overdue' ? Colors.red
+        : status == 'PMS Due Soon' ? Colors.amber.shade700
+        : Colors.grey;
 
-    final nextPms = v['plate'] == 'ABC-1234' ? 'Jun 15, 2026'
-        : v['plate'] == 'XYZ-5678' ? 'TBD (Under Maintenance)'
-        : 'Overdue';
+    // Compute next PMS
+    String nextPms = '—';
+    final lastSvcDate = v['lastSvcDate'] ?? '';
+    final svcFreq = v['svcFreq'] ?? '';
+    if (lastSvcDate.isNotEmpty && svcFreq.isNotEmpty) {
+      final date = DateTime.tryParse(lastSvcDate);
+      final months = int.tryParse(svcFreq);
+      if (date != null && months != null) {
+        final next = DateTime(date.year, date.month + months, date.day);
+        nextPms = '${next.year}-${next.month.toString().padLeft(2, '0')}-${next.day.toString().padLeft(2, '0')}';
+      }
+    }
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFFF7F8FA),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          // ── Red header ──
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-            decoration: const BoxDecoration(
-              color: _red,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-            ),
-            child: Column(children: [
-              // drag handle
-              Container(width: 40, height: 4,
-                decoration: BoxDecoration(color: Colors.white38, borderRadius: BorderRadius.circular(2))),
-              const SizedBox(height: 16),
-              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Container(
-                  width: 56, height: 56,
-                  decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(16)),
-                  child: Icon(isTruck ? Icons.local_shipping : Icons.directions_car, color: Colors.white, size: 28),
-                ),
-                const SizedBox(width: 14),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(v['plate']!, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 2),
-                  Text(v['desc']!, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                ])),
-                GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: Container(
-                    width: 32, height: 32,
-                    decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(16)),
-                    child: const Icon(Icons.close, color: Colors.white, size: 16),
-                  ),
-                ),
-              ]),
-            ]),
+      builder: (_) => DraggableScrollableSheet(
+        expand: false, initialChildSize: 0.75, maxChildSize: 0.95,
+        builder: (_, ctrl) => Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFFF7F8FA),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
-          // ── Details card ──
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-            child: Container(
+          child: Column(children: [
+            // Header
+            Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 2))],
-              ),
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+              decoration: const BoxDecoration(color: _red,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
               child: Column(children: [
-                _detailRow(Icons.calendar_today_outlined, 'Last Service', v['lastSvc']!, const Color(0xFF2b6cb0)),
-                _divider(),
-                _detailRow(Icons.speed_outlined, 'Odometer', v['odo']!, const Color(0xFF718096)),
-                _divider(),
-                _detailRow(Icons.event_outlined, 'Next PMS Due', nextPms, statusColor),
-                _divider(),
-                _detailRow(Icons.info_outline, 'PMS Status', v['pms']!, statusColor),
+                Container(width: 40, height: 4,
+                  decoration: BoxDecoration(color: Colors.white38, borderRadius: BorderRadius.circular(2))),
+                const SizedBox(height: 16),
+                Row(children: [
+                  Container(width: 52, height: 52,
+                    decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(14)),
+                    child: const Icon(Icons.directions_car_outlined, color: Colors.white, size: 26)),
+                  const SizedBox(width: 14),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(v['plate']!, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                    Text(v['desc']!, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                  ])),
+                  GestureDetector(onTap: () => Navigator.pop(context),
+                    child: Container(width: 32, height: 32,
+                      decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(16)),
+                      child: const Icon(Icons.close, color: Colors.white, size: 16))),
+                ]),
               ]),
             ),
-          ),
-        ]),
+            // Body
+            Expanded(
+              child: SingleChildScrollView(
+                controller: ctrl,
+                padding: const EdgeInsets.all(16),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  // Vehicle info card
+                  Container(
+                    width: double.infinity, padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16),
+                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)]),
+                    child: Column(children: [
+                      _detailRow(Icons.speed_outlined, 'Odometer', v['odo']!.isNotEmpty ? v['odo']! : '—', const Color(0xFF718096)),
+                      _divider(),
+                      _detailRow(Icons.calendar_today_outlined, 'Last Service', lastSvcDate.isNotEmpty ? lastSvcDate : '—', const Color(0xFF2b6cb0)),
+                      _divider(),
+                      _detailRow(Icons.event_outlined, 'Next PMS Due', nextPms, statusColor),
+                      _divider(),
+                      _detailRow(Icons.info_outline, 'Status', status, statusColor),
+                    ]),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close, size: 16),
+                      label: const Text('Close'),
+                    )),
+                ]),
+              ),
+            ),
+          ]),
+        ),
       ),
+    );
+  }
+
+  Widget _svcMatLabel(IconData icon, String label, Color color) {
+    return Row(children: [
+      Container(padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
+        child: Icon(icon, size: 13, color: color)),
+      const SizedBox(width: 6),
+      Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
+    ]);
+  }
+
+  Widget _svcMatRow(Map<String, dynamic> item, Color color) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 5),
+      child: Row(children: [
+        Container(width: 4, height: 4, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        const SizedBox(width: 8),
+        Expanded(child: Text(item['name'] as String? ?? '', style: const TextStyle(fontSize: 12, color: Color(0xFF1a202c)))),
+        Text('${item['qty']} ${item['uom']}', style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
+      ]),
     );
   }
 

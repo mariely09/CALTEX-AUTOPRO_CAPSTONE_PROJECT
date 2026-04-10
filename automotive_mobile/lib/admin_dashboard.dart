@@ -156,7 +156,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Widget _navBtn(int i) {
     final active = _currentIndex == i;
     return Expanded(
-      child: GestureDetector(
+      child: InkWell(
         onTap: () => setState(() => _currentIndex = i),
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
           Icon(_navItems[i].icon, color: active ? _red : const Color(0xFF718096), size: 22),
@@ -348,32 +348,102 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   // ── DASHBOARD ──
   Widget _buildDashboard() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Stats grid
-        GridView.count(
-          crossAxisCount: 2, shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
-          crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 1.4,
-          children: [
-            _statCard('Total Vehicles', '24', Icons.directions_car_outlined, const Color(0xFF003087)),
-            _statCard('Due for PMS', '5', Icons.build_outlined, Colors.orange),
-            _statCard('Low Stock', '3', Icons.warning_amber_outlined, _red),
-            _statCard('Services This Week', '18', Icons.check_circle_outline, const Color(0xFF2c7a7b)),
-          ],
-        ),
-        const SizedBox(height: 20),
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('maintenance')
+          .orderBy('createdAt', descending: true)
+          .snapshots(),
+      builder: (context, maintSnap) {
+        return StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance.collection('stock_inventory').snapshots(),
+          builder: (context, stockSnap) {
+            return StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance.collection('vehicles').snapshots(),
+              builder: (context, vehicleSnap) {
+                final maintDocs = maintSnap.data?.docs ?? [];
+                final allServices = maintDocs.map((d) => d.data() as Map<String, dynamic>).toList();
 
-        // Recent Services
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          _sectionTitle('Recent Services'),
-          TextButton(onPressed: () {}, child: const Text('See all', style: TextStyle(fontSize: 12, color: Color(0xFF003087)))),
-        ]),
-        const SizedBox(height: 8),
-        _serviceRow('ABC-1234', 'Change Oil', 'Today, 10:30 AM', 'Completed'),
-        _serviceRow('XYZ-5678', 'Brake Inspection', 'Today, 9:15 AM', 'Completed'),
-        _serviceRow('DEF-9012', 'PMS Service', 'Yesterday, 3:00 PM', 'Completed'),
-      ]),
+                // Stats
+                final totalVehicles = vehicleSnap.data?.docs.length ?? 0;
+                final stockDocs = stockSnap.data?.docs ?? [];
+                final lowStock = stockDocs.where((d) {
+                  final data = d.data() as Map<String, dynamic>;
+                  return (data['status'] as String? ?? '') == 'Low';
+                }).length;
+                final dueForPms = vehicleSnap.data?.docs.where((d) {
+                  final data = d.data() as Map<String, dynamic>;
+                  final status = data['status'] as String? ?? '';
+                  return status == 'Overdue' || status == 'PMS Due Soon';
+                }).length ?? 0;
+
+                // Services today
+                final now = DateTime.now();
+                const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                final todayFormatted = '${months[now.month - 1]} ${now.day}, ${now.year}';
+                final servicesToday = allServices.where((s) =>
+                  (s['date'] as String? ?? '') == todayFormatted).length;
+
+                // Recent services (last 5)
+                final recentServices = allServices.take(5).toList();
+
+                final isLoading = maintSnap.connectionState == ConnectionState.waiting ||
+                    stockSnap.connectionState == ConnectionState.waiting ||
+                    vehicleSnap.connectionState == ConnectionState.waiting;
+
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    GridView.count(
+                      crossAxisCount: 2, shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
+                      crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 1.4,
+                      children: [
+                        _statCard('Total Vehicles', isLoading ? '…' : '$totalVehicles', Icons.directions_car_outlined, const Color(0xFF003087)),
+                        _statCard('Due for PMS', isLoading ? '…' : '$dueForPms', Icons.build_outlined, Colors.orange),
+                        _statCard('Low Stock', isLoading ? '…' : '$lowStock', Icons.warning_amber_outlined, _red),
+                        _statCard('Services Today', isLoading ? '…' : '$servicesToday', Icons.check_circle_outline, const Color(0xFF2c7a7b)),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                      _sectionTitle('Recent Services'),
+                      TextButton(
+                        onPressed: () => setState(() { _currentIndex = 2; _vehTab = 2; }),
+                        child: const Text('See all', style: TextStyle(fontSize: 12, color: Color(0xFF003087)))),
+                    ]),
+                    const SizedBox(height: 8),
+                    if (isLoading)
+                      const Center(child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child: CircularProgressIndicator(),
+                      ))
+                    else if (recentServices.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
+                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)]),
+                        child: const Center(child: Text('No services yet.',
+                          style: TextStyle(color: Color(0xFF718096), fontSize: 13))),
+                      )
+                    else
+                      ...recentServices.map((s) {
+                        final rows = s['svcRows'] as List?;
+                        final serviceName = (rows != null && rows.isNotEmpty)
+                            ? (rows.first['name'] as String? ?? '—')
+                            : (s['desc'] as String? ?? '—');
+                        return _serviceRow(
+                          s['plate'] as String? ?? '—',
+                          serviceName,
+                          s['date'] as String? ?? '—',
+                          s['status'] as String? ?? '—',
+                        );
+                      }),
+                  ]),
+                );
+              },
+            );
+          },
+        );
+      },
     );
   }
 
@@ -399,6 +469,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Widget _serviceRow(String plate, String service, String time, String status) {
+    final statusColor = status == 'Completed' ? Colors.green
+        : status == 'Ongoing' ? Colors.orange
+        : status == 'Pending' ? const Color(0xFF718096)
+        : Colors.green;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
@@ -420,8 +494,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
         ])),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-          child: Text(status, style: const TextStyle(fontSize: 10, color: Colors.green, fontWeight: FontWeight.w600)),
+          decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+          child: Text(status, style: TextStyle(fontSize: 10, color: statusColor, fontWeight: FontWeight.w600)),
         ),
       ]),
     );
@@ -447,29 +521,29 @@ class _AdminDashboardState extends State<AdminDashboard> {
     ]);
   }
 
+  bool _invNavigating = false;
+
   Widget _buildItemMasterRedirect() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_invTab == 0) {
-        Navigator.push(context,
-          MaterialPageRoute(builder: (_) => const AdminInventoryItemMaster()))
-          .then((_) {
-            if (mounted) setState(() => _invTab = 1);
-          });
-      }
-    });
+    if (!_invNavigating) {
+      _invNavigating = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        await Navigator.push(context,
+          MaterialPageRoute(builder: (_) => const AdminInventoryItemMaster()));
+        if (mounted) setState(() { _invTab = 1; _invNavigating = false; });
+      });
+    }
     return const SizedBox.shrink();
   }
 
   Widget _buildStockRedirect() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_invTab == 2) {
-        Navigator.push(context,
-          MaterialPageRoute(builder: (_) => const AdminInventoryStock()))
-          .then((_) {
-            if (mounted) setState(() => _invTab = 1);
-          });
-      }
-    });
+    if (!_invNavigating) {
+      _invNavigating = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        await Navigator.push(context,
+          MaterialPageRoute(builder: (_) => const AdminInventoryStock()));
+        if (mounted) setState(() { _invTab = 1; _invNavigating = false; });
+      });
+    }
     return const SizedBox.shrink();
   }
 
@@ -777,17 +851,19 @@ class _AdminDashboardState extends State<AdminDashboard> {
   int _vehTab = 1; // 0=Vehicle List, 1=Issuances, 2=Maintenance
 
   Widget _buildVehicles() {
-    return Column(children: [
-      Container(
-        color: Colors.white,
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-        child: Row(children: [
-          _vehTabBtn('Vehicle List', 0),
-          _vehTabBtn('Issuances', 1),
-          _vehTabBtn('Maintenance', 2),
-        ]),
-      ),
-      Expanded(child: _vehTab == 0 ? _buildVehicleListRedirect() : _vehTab == 1 ? _buildIssuances() : _buildMaintenanceRedirect()),
+    return Stack(children: [
+      Column(children: [
+        Container(
+          color: Colors.white,
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: Row(children: [
+            _vehTabBtn('Vehicle List', 0),
+            _vehTabBtn('Issuances', 1),
+            _vehTabBtn('Maintenance', 2),
+          ]),
+        ),
+        Expanded(child: _vehTab == 0 ? _buildVehicleListRedirect() : _vehTab == 1 ? _buildIssuances() : _buildMaintenanceRedirect()),
+      ]),
     ]);
   }
 
@@ -806,29 +882,29 @@ class _AdminDashboardState extends State<AdminDashboard> {
     ));
   }
 
+  bool _vehNavigating = false;
+
   Widget _buildVehicleListRedirect() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_vehTab == 0) {
-        Navigator.push(context,
-          MaterialPageRoute(builder: (_) => const AdminVehiclesList()))
-          .then((_) {
-            if (mounted) setState(() => _vehTab = 1);
-          });
-      }
-    });
+    if (!_vehNavigating) {
+      _vehNavigating = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        await Navigator.push(context,
+          MaterialPageRoute(builder: (_) => const AdminVehiclesList()));
+        if (mounted) setState(() { _vehTab = 1; _vehNavigating = false; });
+      });
+    }
     return const SizedBox.shrink();
   }
 
   Widget _buildMaintenanceRedirect() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_vehTab == 2) {
-        Navigator.push(context,
-          MaterialPageRoute(builder: (_) => const AdminVehicleMaintenance()))
-          .then((_) {
-            if (mounted) setState(() => _vehTab = 1);
-          });
-      }
-    });
+    if (!_vehNavigating) {
+      _vehNavigating = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        await Navigator.push(context,
+          MaterialPageRoute(builder: (_) => const AdminVehicleMaintenance()));
+        if (mounted) setState(() { _vehTab = 1; _vehNavigating = false; });
+      });
+    }
     return const SizedBox.shrink();
   }
 
@@ -924,89 +1000,109 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Widget _buildIssuances() {
-    final issuances = [
-      {'id': 'ISS-001', 'date': 'Mar 28, 2026', 'assetNum': 'AST-001', 'plate': 'ABC-1234', 'assetDesc': 'Isuzu Truck NQR 2021', 'itemNum': 'ITM-004', 'itemName': 'Oil Change Service', 'itemType': 'Service', 'commodityGroup': 'Labor', 'uom': 'job', 'qty': '1', 'unitCost': '500.00', 'subtotal': '500.00', 'createdBy': 'Admin'},
-      {'id': 'ISS-002', 'date': 'Mar 28, 2026', 'assetNum': 'AST-001', 'plate': 'ABC-1234', 'assetDesc': 'Isuzu Truck NQR 2021', 'itemNum': 'ITM-001', 'itemName': 'Engine Oil 10W-40', 'itemType': 'Material', 'commodityGroup': 'Lubricants', 'uom': 'L', 'qty': '4', 'unitCost': '450.00', 'subtotal': '1800.00', 'createdBy': 'Admin'},
-      {'id': 'ISS-003', 'date': 'Mar 28, 2026', 'assetNum': 'AST-001', 'plate': 'ABC-1234', 'assetDesc': 'Isuzu Truck NQR 2021', 'itemNum': 'ITM-002', 'itemName': 'Oil Filter', 'itemType': 'Material', 'commodityGroup': 'Filters', 'uom': 'pcs', 'qty': '1', 'unitCost': '180.00', 'subtotal': '180.00', 'createdBy': 'Admin'},
-      {'id': 'ISS-004', 'date': 'Mar 27, 2026', 'assetNum': 'AST-002', 'plate': 'XYZ-5678', 'assetDesc': 'Toyota Hilux 2020', 'itemNum': 'ITM-003', 'itemName': 'Brake Pads', 'itemType': 'Material', 'commodityGroup': 'Brakes', 'uom': 'set', 'qty': '1', 'unitCost': '1200.00', 'subtotal': '1200.00', 'createdBy': 'Admin'},
-    ];
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('issuances')
+          .orderBy('createdAt', descending: true)
+          .limit(50)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final docs = snapshot.data?.docs ?? [];
+        final issuances = docs.map((d) {
+          final data = d.data() as Map<String, dynamic>;
+          return {
+            'docId': d.id,
+            'id': data['id'] as String? ?? d.id,
+            'date': data['date'] as String? ?? '—',
+            'plate': data['plate'] as String? ?? '—',
+            'assetDesc': data['assetDesc'] as String? ?? '—',
+            'itemNum': data['itemNum'] as String? ?? '—',
+            'itemName': data['itemName'] as String? ?? '—',
+            'itemType': data['itemType'] as String? ?? 'Material',
+            'commodityGroup': data['commodityGroup'] as String? ?? '—',
+            'uom': data['uom'] as String? ?? '—',
+            'qty': data['qty'] as String? ?? '0',
+            'unitCost': data['unitCost'] as String? ?? '0',
+            'subtotal': data['subtotal'] as String? ?? '0',
+            'createdBy': data['createdBy'] as String? ?? '—',
+          };
+        }).toList();
 
-    final totalServices = issuances.where((i) => i['itemType'] == 'Service').length;
-    final totalMaterials = issuances.where((i) => i['itemType'] == 'Material').length;
-    final totalValue = issuances.fold<double>(0, (sum, i) => sum + (double.tryParse(i['subtotal']!) ?? 0));
+        final totalServices = issuances.where((i) => i['itemType'] == 'Service').length;
+        final totalMaterials = issuances.where((i) => i['itemType'] == 'Material').length;
 
-    return Column(children: [
-      Container(
-        color: Colors.white,
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.center, children: [
-          const Text('Vehicle Issuances', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1a202c))),
-          const Text('Items issued per service transaction', style: TextStyle(fontSize: 12, color: Color(0xFF718096))),
-          const SizedBox(height: 12),
-          Row(children: [
-            _issStatChip('Total', '${issuances.length}', Colors.blue),
-            const SizedBox(width: 8),
-            _issStatChip('Services', '$totalServices', const Color(0xFF003087)),
-            const SizedBox(width: 8),
-            _issStatChip('Materials', '$totalMaterials', Colors.green),
-          ]),
-        ]),
-      ),
-      Expanded(
-        child: ListView.separated(
-          padding: const EdgeInsets.all(16),
-          itemCount: issuances.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 10),
-          itemBuilder: (_, i) {
-            final iss = issuances[i];
-            final isService = iss['itemType'] == 'Service';
-            final typeColor = isService ? const Color(0xFF003087) : _red;
-            final typeBg = isService ? const Color(0xFFebf8ff) : const Color(0xFFfff5f5);
-            return GestureDetector(
-              onTap: () => _showIssuanceDetails(iss),
-              child: Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)],
-                ),
-                child: Row(children: [
-                  Container(
-                    width: 44, height: 44,
-                    decoration: BoxDecoration(color: typeBg, borderRadius: BorderRadius.circular(12)),
-                    child: Icon(isService ? Icons.build_outlined : Icons.inventory_2_outlined, color: typeColor, size: 20),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(iss['itemName']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                    const SizedBox(height: 2),
-                    Text('${iss['plate']} • ${iss['assetDesc']}', style: const TextStyle(fontSize: 11, color: Color(0xFF4a5568))),
-                    const SizedBox(height: 2),
-                    Row(children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(color: typeBg, borderRadius: BorderRadius.circular(20)),
-                        child: Text(iss['itemType']!, style: TextStyle(fontSize: 9, color: typeColor, fontWeight: FontWeight.w700)),
+        return Column(children: [
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.center, children: [
+              const Text('Vehicle Issuances', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1a202c))),
+              const Text('Items issued per service transaction', style: TextStyle(fontSize: 12, color: Color(0xFF718096))),
+              const SizedBox(height: 12),
+              Row(children: [
+                _issStatChip('Total', '${issuances.length}', Colors.blue),
+                const SizedBox(width: 8),
+                _issStatChip('Services', '$totalServices', const Color(0xFF003087)),
+                const SizedBox(width: 8),
+                _issStatChip('Materials', '$totalMaterials', Colors.green),
+              ]),
+            ]),
+          ),
+          Expanded(
+            child: issuances.isEmpty
+              ? const Center(child: Text('No issuances yet.', style: TextStyle(color: Color(0xFF718096))))
+              : ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: issuances.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (_, i) {
+                    final iss = issuances[i];
+                    final isService = iss['itemType'] == 'Service';
+                    final typeColor = isService ? const Color(0xFF003087) : _red;
+                    final typeBg = isService ? const Color(0xFFebf8ff) : const Color(0xFFfff5f5);
+                    final subtotal = double.tryParse(iss['subtotal']!) ?? 0;
+                    return GestureDetector(
+                      onTap: () => _showIssuanceDetails(iss),
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
+                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)]),
+                        child: Row(children: [
+                          Container(width: 44, height: 44,
+                            decoration: BoxDecoration(color: typeBg, borderRadius: BorderRadius.circular(12)),
+                            child: Icon(isService ? Icons.build_outlined : Icons.inventory_2_outlined, color: typeColor, size: 20)),
+                          const SizedBox(width: 12),
+                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text(iss['itemName']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                            Text('${iss['plate']} • ${iss['commodityGroup']}', style: const TextStyle(fontSize: 11, color: Color(0xFF4a5568))),
+                            Row(children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(color: typeBg, borderRadius: BorderRadius.circular(20)),
+                                child: Text(iss['itemType']!, style: TextStyle(fontSize: 9, color: typeColor, fontWeight: FontWeight.w700)),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(iss['date']!, style: const TextStyle(fontSize: 10, color: Color(0xFF718096))),
+                            ]),
+                          ])),
+                          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                            Text('₱${subtotal.toStringAsFixed(2)}',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1a202c))),
+                            Text('${iss['qty']} ${iss['uom']}',
+                              style: const TextStyle(fontSize: 10, color: Color(0xFF718096))),
+                          ]),
+                        ]),
                       ),
-                      const SizedBox(width: 6),
-                      Text(iss['date']!, style: const TextStyle(fontSize: 10, color: Color(0xFF718096))),
-                    ]),
-                  ])),
-                  Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                    Text('₱${double.parse(iss['subtotal']!).toStringAsFixed(2)}',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1a202c))),
-                    const SizedBox(height: 4),
-                    Text('${iss['qty']} ${iss['uom']}',
-                      style: const TextStyle(fontSize: 10, color: Color(0xFF718096))),
-                  ]),
-                ]),
-              ),
-            );
-          },
-        ),
-      ),
-    ]);
+                    );
+                  },
+                ),
+          ),
+        ]);
+      },
+    );
   }
 
   Widget _issStatChip(String label, String value, Color color) {
@@ -1026,20 +1122,17 @@ class _AdminDashboardState extends State<AdminDashboard> {
   void _showIssuanceDetails(Map<String, String> iss) {
     final isService = iss['itemType'] == 'Service';
     final typeColor = isService ? const Color(0xFF003087) : _red;
-    final typeBg = isService ? const Color(0xFFebf8ff) : const Color(0xFFfff5f5);
     final subtotal = double.tryParse(iss['subtotal']!) ?? 0;
     final unitCost = double.tryParse(iss['unitCost']!) ?? 0;
 
     showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
+      context: context, isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => DraggableScrollableSheet(
         expand: false, initialChildSize: 0.75, maxChildSize: 0.92,
         builder: (_, ctrl) => SingleChildScrollView(
           controller: ctrl,
           child: Column(children: [
-            // Header
             Container(
               width: double.infinity,
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
@@ -1059,14 +1152,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(children: [
-                // Subtotal + Date banner
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFFe2e8f0)),
-                  ),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFe2e8f0))),
                   child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                     Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       const Text('Subtotal', style: TextStyle(color: Color(0xFF718096), fontSize: 10, fontWeight: FontWeight.w700)),
@@ -1080,27 +1169,25 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   ]),
                 ),
                 const SizedBox(height: 12),
-                // Item Details
                 Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
+                  width: double.infinity, padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: const Color(0xFFe2e8f0))),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     const Text('📋  ITEM DETAILS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF718096), letterSpacing: 0.5)),
                     const SizedBox(height: 12),
-                    _issGridRow('Item Number', iss['itemNum']!),
                     _issGridRow('Item Name', iss['itemName']!),
                     _issGridRow('Item Type', iss['itemType']!),
                     _issGridRow('Commodity Group', iss['commodityGroup']!),
                     _issGridRow('UOM', iss['uom']!),
+                    _issGridRow('Vehicle Plate', iss['plate']!),
+                    _issGridRow('Vehicle', iss['assetDesc']!),
+                    _issGridRow('Issued By', iss['createdBy']!),
                   ]),
                 ),
                 const SizedBox(height: 12),
-                // Cost Breakdown
                 Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
+                  width: double.infinity, padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: const Color(0xFFe2e8f0))),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
