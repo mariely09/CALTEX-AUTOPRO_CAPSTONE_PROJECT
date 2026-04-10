@@ -258,8 +258,8 @@ class _LoginScreenState extends State<LoginScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Center(child: Text('Welcome to Caltex AutoPro',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1a202c)))),
+                const Center(child: Text('Login',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1a202c)))),
                 const SizedBox(height: 4),
                 const Center(child: Text('Sign in to your account',
                   style: TextStyle(fontSize: 13, color: Color(0xFF718096)))),
