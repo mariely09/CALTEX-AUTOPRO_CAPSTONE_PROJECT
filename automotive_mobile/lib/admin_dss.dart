@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AdminDSS extends StatefulWidget {
   const AdminDSS({super.key});
@@ -57,11 +58,46 @@ class _AdminDSSState extends State<AdminDSS> {
   }
 
   Widget _buildStockDSS() {
-    final items = [
-      {'name': 'Oil Filter', 'stock': '3 pcs', 'days': '5 days', 'order': '20 pcs', 'priority': 'Critical', 'group': 'Filters', 'consumptionRate': '0.6 pcs/day'},
-      {'name': 'Air Filter', 'stock': '2 pcs', 'days': '3 days', 'order': '15 pcs', 'priority': 'Critical', 'group': 'Filters', 'consumptionRate': '0.7 pcs/day'},
-      {'name': 'Engine Oil', 'stock': '24 L', 'days': '30 days', 'order': '—', 'priority': 'OK', 'group': 'Lubricants', 'consumptionRate': '0.8 L/day'},
-    ];
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('stock_inventory').snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final docs = snapshot.data?.docs ?? [];
+        final items = docs.map((d) {
+          final data = d.data() as Map<String, dynamic>;
+          final stock = (data['stock'] as num?)?.toInt() ?? 0;
+          final min = (data['min'] as num?)?.toInt() ?? 0;
+          final reorder = (data['reorder'] as num?)?.toInt() ?? 0;
+          final uom = data['uom'] as String? ?? '';
+          final isCritical = stock <= min;
+          // Estimate days left: assume consumption = reorder/30 per day if reorder set, else 1/day
+          final dailyRate = reorder > 0 ? reorder / 30.0 : 1.0;
+          final daysLeft = dailyRate > 0 ? (stock / dailyRate).round() : 999;
+          final orderQty = reorder > 0 ? '$reorder $uom' : '—';
+          return {
+            'name': data['name'] as String? ?? '—',
+            'stock': '$stock $uom',
+            'days': daysLeft < 999 ? '$daysLeft days' : '—',
+            'order': orderQty,
+            'priority': isCritical ? 'Critical' : 'OK',
+            'group': data['group'] as String? ?? '—',
+            'consumptionRate': dailyRate > 0 ? '${dailyRate.toStringAsFixed(1)} $uom/day' : '—',
+          };
+        }).toList()
+          ..sort((a, b) {
+            if (a['priority'] == 'Critical' && b['priority'] != 'Critical') return -1;
+            if (a['priority'] != 'Critical' && b['priority'] == 'Critical') return 1;
+            return 0;
+          });
+
+        return _buildStockDSSContent(items);
+      },
+    );
+  }
+
+  Widget _buildStockDSSContent(List<Map<String, String>> items) {
 
     return Column(children: [
       Container(
@@ -394,12 +430,64 @@ class _AdminDSSState extends State<AdminDSS> {
   }
 
   Widget _buildPMSDSS() {
-    final assets = [
-      {'plate': 'DEF-9012', 'desc': 'Mitsubishi L300', 'due': 'Overdue 45 days', 'priority': 'Overdue', 'lastService': 'Jan 15, 2026', 'nextPMS': 'Feb 15, 2026'},
-      {'plate': 'XYZ-5678', 'desc': 'Toyota Hilux', 'due': 'Due in 3 days', 'priority': 'Due Soon', 'lastService': 'Jan 5, 2026', 'nextPMS': 'Apr 10, 2026'},
-      {'plate': 'ABC-1234', 'desc': 'Isuzu Truck NQR', 'due': 'Due in 2 months', 'priority': 'On Track', 'lastService': 'Feb 1, 2026', 'nextPMS': 'Jun 1, 2026'},
-    ];
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('vehicles').snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final docs = snapshot.data?.docs ?? [];
+        final now = DateTime.now();
+        final assets = docs.map((d) {
+          final data = d.data() as Map<String, dynamic>;
+          final plate = data['plate'] as String? ?? '';
+          final desc = data['desc'] as String? ?? '';
+          final lastSvcDate = data['lastSvcDate'] as String? ?? '';
+          final svcFreq = data['svcFreq'] as String? ?? '';
+          final lastDate = DateTime.tryParse(lastSvcDate);
+          final months = int.tryParse(svcFreq);
 
+          String due = '—';
+          String priority = 'On Track';
+          String nextPMS = '—';
+          String lastService = lastSvcDate.isNotEmpty ? lastSvcDate : '—';
+
+          if (lastDate != null && months != null) {
+            final next = DateTime(lastDate.year, lastDate.month + months, lastDate.day);
+            nextPMS = '${next.year}-${next.month.toString().padLeft(2,'0')}-${next.day.toString().padLeft(2,'0')}';
+            final daysUntil = next.difference(now).inDays;
+            if (daysUntil < 0) {
+              due = 'Overdue ${(-daysUntil)} days';
+              priority = 'Overdue';
+            } else if (daysUntil <= 30) {
+              due = 'Due in $daysUntil days';
+              priority = 'Due Soon';
+            } else {
+              due = 'Due in ${(daysUntil / 30).round()} month(s)';
+              priority = 'On Track';
+            }
+          }
+
+          return {
+            'plate': plate,
+            'desc': desc,
+            'due': due,
+            'priority': priority,
+            'lastService': lastService,
+            'nextPMS': nextPMS,
+          };
+        }).toList()
+          ..sort((a, b) {
+            const order = {'Overdue': 0, 'Due Soon': 1, 'On Track': 2};
+            return (order[a['priority']] ?? 3).compareTo(order[b['priority']] ?? 3);
+          });
+
+        return _buildPMSDSSContent(assets);
+      },
+    );
+  }
+
+  Widget _buildPMSDSSContent(List<Map<String, String>> assets) {
     return Column(children: [
       Container(
         color: Colors.white,

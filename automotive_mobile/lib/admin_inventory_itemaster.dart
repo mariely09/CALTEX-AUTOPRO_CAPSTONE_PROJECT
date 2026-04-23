@@ -462,11 +462,24 @@ class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
                         try {
                           if (isEdit) {
                             await _db.doc(item!['id']).update(data);
+                            if (ctx.mounted) {
+                              Navigator.pop(ctx);
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                content: Row(children: const [Icon(Icons.check_circle_outline, color: Colors.white, size: 18), SizedBox(width: 8), Text('Item updated successfully!')]),
+                                backgroundColor: Colors.green, behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
+                            }
                           } else {
                             data['createdAt'] = FieldValue.serverTimestamp();
                             await _db.add(data);
+                            if (ctx.mounted) {
+                              Navigator.pop(ctx);
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                content: Row(children: const [Icon(Icons.check_circle_outline, color: Colors.white, size: 18), SizedBox(width: 8), Text('Item added successfully!')]),
+                                backgroundColor: Colors.green, behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
+                            }
                           }
-                          if (ctx.mounted) Navigator.pop(ctx);
                         } catch (e) {
                           if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(
                             SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
@@ -498,6 +511,10 @@ class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
               Navigator.pop(context);
               try {
                 await _db.doc(item['id']).delete();
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Row(children: const [Icon(Icons.check_circle_outline, color: Colors.white, size: 18), SizedBox(width: 8), Text('Item deleted successfully!')]),
+                  backgroundColor: Colors.red, behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
               } catch (e) {
                 if (mounted) ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));

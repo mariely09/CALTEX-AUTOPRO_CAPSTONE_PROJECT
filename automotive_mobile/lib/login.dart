@@ -5,6 +5,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'staff_dashboard.dart';
 import 'customer_dashboard.dart';
 import 'admin_dashboard.dart';
+import 'forgot_password.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -139,82 +140,8 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _showForgotPassword() {
-    final emailCtrl = TextEditingController();
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Container(
-                width: 40, height: 40,
-                decoration: BoxDecoration(color: _red.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
-                child: const Icon(Icons.lock_reset_outlined, color: _red, size: 20)),
-              const SizedBox(width: 12),
-              const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Reset Password', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1a202c))),
-                Text("We'll send a reset link to your email", style: TextStyle(fontSize: 12, color: Color(0xFF718096))),
-              ])),
-              GestureDetector(
-                onTap: () => Navigator.pop(ctx),
-                child: const Icon(Icons.close, color: Color(0xFF718096))),
-            ]),
-            const SizedBox(height: 20),
-            TextField(
-              controller: emailCtrl,
-              keyboardType: TextInputType.emailAddress,
-              autofocus: true,
-              decoration: _inputDecoration('Enter your email', Icons.email_outlined),
-            ),
-            const SizedBox(height: 16),
-            StatefulBuilder(
-              builder: (ctx2, setSt) {
-                bool sending = false;
-                return SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: sending ? null : () async {
-                      final email = emailCtrl.text.trim();
-                      if (email.isEmpty) return;
-                      setSt(() => sending = true);
-                      try {
-                        await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
-                        if (ctx.mounted) {
-                          Navigator.pop(ctx);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Reset link sent! Check your email.'),
-                              backgroundColor: Colors.green));
-                        }
-                      } on FirebaseAuthException catch (e) {
-                        if (ctx2.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(e.message ?? 'Failed to send reset email.'),
-                              backgroundColor: Colors.redAccent));
-                          setSt(() => sending = false);
-                        }
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _red, foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    child: sending
-                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        : const Text('Send Reset Link', style: TextStyle(fontWeight: FontWeight.w700)),
-                  ),
-                );
-              },
-            ),
-          ]),
-        ),
-      ),
-    );
+    Navigator.push(context,
+      MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()));
   }
 
   @override

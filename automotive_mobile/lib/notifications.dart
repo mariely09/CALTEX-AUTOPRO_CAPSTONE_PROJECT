@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum NotificationRole { admin, staff, customer }
 
@@ -11,42 +13,65 @@ class AppNotifications extends StatefulWidget {
 }
 
 class _AppNotificationsState extends State<AppNotifications> {
-  static const _red = Color(0xFFE8001C);
+  static const _red  = Color(0xFFE8001C);
   static const _blue = Color(0xFF003087);
 
-  late final List<Map<String, dynamic>> _notifications;
-
-  @override
-  void initState() {
-    super.initState();
+  String get _roleString {
     switch (widget.role) {
-      case NotificationRole.admin:
-        _notifications = [
-          {'id': 1, 'type': 'warning', 'title': 'PMS Overdue', 'message': '2 vehicles have overdue maintenance schedules.', 'time': '2 mins ago', 'read': false},
-          {'id': 2, 'type': 'warning', 'title': 'Low Stock Alert', 'message': 'Oil Filter and Air Filter are critically low.', 'time': '15 mins ago', 'read': false},
-          {'id': 3, 'type': 'info', 'title': 'Service Completed', 'message': 'SVC-001 for ABC-1234 has been marked as completed.', 'time': '1 hour ago', 'read': false},
-          {'id': 4, 'type': 'info', 'title': 'New User Registered', 'message': 'A new customer account has been created.', 'time': '3 hours ago', 'read': true},
-          {'id': 5, 'type': 'success', 'title': 'Stock Received', 'message': 'Engine Oil 10W-40 — 20 L received from delivery.', 'time': 'Yesterday', 'read': true},
-          {'id': 6, 'type': 'warning', 'title': 'PMS Due Soon', 'message': 'XYZ-5678 Toyota Hilux is due for PMS in 3 days.', 'time': 'Yesterday', 'read': true},
-        ];
-        break;
-      case NotificationRole.staff:
-        _notifications = [
-          {'id': 1, 'type': 'warning', 'title': 'Low Stock Alert', 'message': 'Oil Filter and Air Filter are critically low.', 'time': '15 mins ago', 'read': false},
-          {'id': 2, 'type': 'info', 'title': 'Service Assigned', 'message': 'SVC-004 for DEF-9012 has been assigned to you.', 'time': '1 hour ago', 'read': false},
-          {'id': 3, 'type': 'success', 'title': 'Stock Received', 'message': 'Engine Oil 10W-40 — 20 L received from delivery.', 'time': '3 hours ago', 'read': false},
-          {'id': 4, 'type': 'info', 'title': 'Service Completed', 'message': 'SVC-001 for ABC-1234 has been marked as completed.', 'time': 'Yesterday', 'read': true},
-          {'id': 5, 'type': 'warning', 'title': 'PMS Due Soon', 'message': 'XYZ-5678 Toyota Hilux is due for PMS in 3 days.', 'time': 'Yesterday', 'read': true},
-        ];
-        break;
-      case NotificationRole.customer:
-        _notifications = [
-          {'id': 1, 'type': 'warning', 'title': 'PMS Overdue', 'message': 'DEF-9012 Mitsubishi L300 is overdue for PMS.', 'time': '1 hr ago', 'read': false},
-          {'id': 2, 'type': 'success', 'title': 'Service Complete', 'message': 'ABC-1234 oil change has been completed.', 'time': '3 hrs ago', 'read': false},
-          {'id': 3, 'type': 'warning', 'title': 'PMS Due Soon', 'message': 'ABC-1234 Isuzu Truck is due for PMS in 2 months.', 'time': 'Yesterday', 'read': true},
-        ];
-        break;
+      case NotificationRole.admin:    return 'admin';
+      case NotificationRole.staff:    return 'staff';
+      case NotificationRole.customer: return 'customer';
     }
+  }
+
+  String? get _uid => FirebaseAuth.instance.currentUser?.uid;
+
+  /// Stream: notifications where targetRole matches OR targetUid matches current user
+  Stream<QuerySnapshot> get _stream {
+    final uid = _uid;
+    // Role-wide notifications
+    return FirebaseFirestore.instance
+        .collection('notifications')
+        .where('targetRole', isEqualTo: _roleString)
+        .orderBy('createdAt', descending: true)
+        .snapshots();
+  }
+
+  /// Personal notifications for this specific user
+  Stream<QuerySnapshot> get _personalStream {
+    final uid = _uid;
+    if (uid == null) return const Stream.empty();
+    return FirebaseFirestore.instance
+        .collection('notifications')
+        .where('targetUid', isEqualTo: uid)
+        .orderBy('createdAt', descending: true)
+        .snapshots();
+  }
+
+  Future<void> _markRead(String docId) async {
+    final uid = _uid;
+    if (uid == null) return;
+    await FirebaseFirestore.instance
+        .collection('notifications')
+        .doc(docId)
+        .update({'readBy.$uid': true});
+  }
+
+  Future<void> _markAllRead(List<QueryDocumentSnapshot> docs) async {
+    final uid = _uid;
+    if (uid == null) return;
+    final batch = FirebaseFirestore.instance.batch();
+    for (final doc in docs) {
+      batch.update(doc.reference, {'readBy.$uid': true});
+    }
+    await batch.commit();
+  }
+
+  bool _isUnread(Map<String, dynamic> data) {
+    final uid = _uid;
+    if (uid == null) return false;
+    final readBy = data['readBy'] as Map<String, dynamic>? ?? {};
+    return readBy[uid] != true;
   }
 
   Color _typeColor(String type) {
@@ -61,15 +86,15 @@ class _AppNotificationsState extends State<AppNotifications> {
     return Icons.info_outline;
   }
 
-  int get _unreadCount => _notifications.where((n) => n['read'] == false).length;
-
-  void _markAllRead() => setState(() {
-    for (final n in _notifications) n['read'] = true;
-  });
-
-  void _markRead(int id) => setState(() {
-    _notifications.firstWhere((n) => n['id'] == id)['read'] = true;
-  });
+  String _timeAgo(Timestamp? ts) {
+    if (ts == null) return '';
+    final diff = DateTime.now().difference(ts.toDate());
+    if (diff.inSeconds < 60)  return 'Just now';
+    if (diff.inMinutes < 60)  return '${diff.inMinutes} min ago';
+    if (diff.inHours < 24)    return '${diff.inHours} hr ago';
+    if (diff.inDays == 1)     return 'Yesterday';
+    return '${diff.inDays} days ago';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -81,74 +106,133 @@ class _AppNotificationsState extends State<AppNotifications> {
         iconTheme: const IconThemeData(color: Colors.white),
         title: const Text('Notifications',
           style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-        actions: [
-          if (_unreadCount > 0)
-            TextButton(
-              onPressed: _markAllRead,
-              child: const Text('Mark all read', style: TextStyle(color: Colors.white, fontSize: 12)),
-            ),
-        ],
       ),
-      body: Column(children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-          child: Row(children: [
-            const Icon(Icons.notifications_outlined, size: 16, color: Color(0xFF718096)),
-            const SizedBox(width: 6),
-            Text(
-              _unreadCount > 0
-                ? '$_unreadCount unread notification${_unreadCount > 1 ? 's' : ''}'
-                : 'All caught up!',
-              style: const TextStyle(fontSize: 12, color: Color(0xFF718096)),
-            ),
-          ]),
-        ),
-        Expanded(
-          child: ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: _notifications.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 10),
-            itemBuilder: (_, i) {
-              final n = _notifications[i];
-              final color = _typeColor(n['type']);
-              final isUnread = n['read'] == false;
-              return GestureDetector(
-                onTap: () => _markRead(n['id']),
-                child: Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: isUnread ? color.withOpacity(0.04) : Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: isUnread ? Border.all(color: color.withOpacity(0.2)) : null,
-                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)],
-                  ),
-                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Container(width: 40, height: 40,
-                      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
-                      child: Icon(_typeIcon(n['type']), color: color, size: 20)),
-                    const SizedBox(width: 12),
-                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                        Text(n['title'], style: TextStyle(
-                          fontWeight: isUnread ? FontWeight.bold : FontWeight.w600,
-                          fontSize: 13, color: const Color(0xFF1a202c))),
-                        Text(n['time'], style: const TextStyle(fontSize: 10, color: Color(0xFF718096))),
-                      ]),
-                      const SizedBox(height: 3),
-                      Text(n['message'], style: const TextStyle(fontSize: 12, color: Color(0xFF4a5568))),
-                    ])),
-                    if (isUnread) ...[
-                      const SizedBox(width: 8),
-                      Container(width: 8, height: 8,
-                        decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-                    ],
+      body: StreamBuilder<QuerySnapshot>(
+        stream: _stream,
+        builder: (context, roleSnap) {
+          return StreamBuilder<QuerySnapshot>(
+            stream: _personalStream,
+            builder: (context, personalSnap) {
+              if (roleSnap.connectionState == ConnectionState.waiting ||
+                  personalSnap.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              // Merge role-wide + personal, deduplicate by doc ID
+              final Map<String, QueryDocumentSnapshot> merged = {};
+              for (final doc in roleSnap.data?.docs ?? []) {
+                merged[doc.id] = doc;
+              }
+              for (final doc in personalSnap.data?.docs ?? []) {
+                merged[doc.id] = doc;
+              }
+
+              // Sort by createdAt descending
+              final docs = merged.values.toList()
+                ..sort((a, b) {
+                  final aTs = (a.data() as Map)['createdAt'] as Timestamp?;
+                  final bTs = (b.data() as Map)['createdAt'] as Timestamp?;
+                  if (aTs == null || bTs == null) return 0;
+                  return bTs.compareTo(aTs);
+                });
+
+              final unreadCount = docs.where((d) => _isUnread(d.data() as Map<String, dynamic>)).length;
+
+              if (docs.isEmpty) {
+                return const Center(
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.notifications_off_outlined, size: 48, color: Color(0xFFcbd5e0)),
+                    SizedBox(height: 12),
+                    Text('No notifications yet', style: TextStyle(color: Color(0xFF718096))),
+                  ]),
+                );
+              }
+
+              return Column(children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                  child: Row(children: [
+                    const Icon(Icons.notifications_outlined, size: 16, color: Color(0xFF718096)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        unreadCount > 0
+                          ? '$unreadCount unread notification${unreadCount > 1 ? 's' : ''}'
+                          : 'All caught up!',
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF718096)),
+                      ),
+                    ),
+                    if (unreadCount > 0)
+                      TextButton(
+                        onPressed: () => _markAllRead(docs),
+                        style: TextButton.styleFrom(foregroundColor: _red),
+                        child: const Text('Mark all read', style: TextStyle(fontSize: 12)),
+                      ),
                   ]),
                 ),
-              );
+                Expanded(
+                  child: ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: docs.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (_, i) {
+                      final doc  = docs[i];
+                      final data = doc.data() as Map<String, dynamic>;
+                      final type    = data['type'] as String? ?? 'info';
+                      final color   = _typeColor(type);
+                      final isUnread = _isUnread(data);
+                      final ts = data['createdAt'] as Timestamp?;
+
+                      return GestureDetector(
+                        onTap: () => _markRead(doc.id),
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: isUnread ? color.withOpacity(0.04) : Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: isUnread ? Border.all(color: color.withOpacity(0.2)) : null,
+                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)],
+                          ),
+                          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Container(
+                              width: 40, height: 40,
+                              decoration: BoxDecoration(
+                                color: color.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(10)),
+                              child: Icon(_typeIcon(type), color: color, size: 20),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                                Expanded(
+                                  child: Text(data['title'] as String? ?? '',
+                                    style: TextStyle(
+                                      fontWeight: isUnread ? FontWeight.bold : FontWeight.w600,
+                                      fontSize: 13, color: const Color(0xFF1a202c))),
+                                ),
+                                Text(_timeAgo(ts),
+                                  style: const TextStyle(fontSize: 10, color: Color(0xFF718096))),
+                              ]),
+                              const SizedBox(height: 3),
+                              Text(data['message'] as String? ?? '',
+                                style: const TextStyle(fontSize: 12, color: Color(0xFF4a5568))),
+                            ])),
+                            if (isUnread) ...[
+                              const SizedBox(width: 8),
+                              Container(width: 8, height: 8,
+                                decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+                            ],
+                          ]),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ]);
             },
-          ),
-        ),
-      ]),
+          );
+        },
+      ),
     );
   }
 }

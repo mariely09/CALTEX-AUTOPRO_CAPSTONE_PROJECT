@@ -5,6 +5,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'login.dart';
+import 'change_password.dart';
+import 'notifs_manageAlerts.dart';
+import 'help_support.dart';
 
 enum UserRole { customer, staff, admin }
 
@@ -103,13 +106,20 @@ class _UserProfileState extends State<UserProfile> {
     final isStandalone = widget.role != UserRole.customer;
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
-      appBar: isStandalone ? AppBar(
+      appBar: AppBar(
         backgroundColor: _red,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
         title: const Text('Profile',
           style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-      ) : null,
+        leading: isStandalone
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: () => Navigator.pop(context),
+              ),
+        automaticallyImplyLeading: isStandalone,
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
@@ -204,9 +214,27 @@ class _UserProfileState extends State<UserProfile> {
                     _sectionLabel('SETTINGS'),
                     const SizedBox(height: 8),
                     _actionCard([
-                      _actionTile(Icons.notifications_outlined, 'Notifications', 'Manage alerts', () {}),
-                      _actionTile(Icons.lock_outline, 'Change Password', 'Update credentials', () {}),
-                      _actionTile(Icons.help_outline, 'Help & Support', 'Get assistance', () {}, isLast: true),
+                      _actionTile(Icons.notifications_outlined, 'Notifications', 'Manage alerts', () {
+                        final alertRole = switch (widget.role) {
+                          UserRole.admin    => ManageAlertsRole.admin,
+                          UserRole.staff    => ManageAlertsRole.staff,
+                          UserRole.customer => ManageAlertsRole.customer,
+                        };
+                        Navigator.push(context, MaterialPageRoute(
+                          builder: (_) => ManageAlertsScreen(role: alertRole)));
+                      }),
+                      _actionTile(Icons.lock_outline, 'Change Password', 'Update credentials', () {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen()));
+                      }),
+                      _actionTile(Icons.help_outline, 'Help & Support', 'Get assistance', () {
+                        final helpRole = switch (widget.role) {
+                          UserRole.admin    => HelpSupportRole.admin,
+                          UserRole.staff    => HelpSupportRole.staff,
+                          UserRole.customer => HelpSupportRole.customer,
+                        };
+                        Navigator.push(context, MaterialPageRoute(
+                          builder: (_) => HelpSupportScreen(role: helpRole)));
+                      }, isLast: true),
                     ]),
                     const SizedBox(height: 20),
 

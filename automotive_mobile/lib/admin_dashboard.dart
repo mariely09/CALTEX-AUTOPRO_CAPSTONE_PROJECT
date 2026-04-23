@@ -405,7 +405,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     ),
                     const SizedBox(height: 20),
                     Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                      _sectionTitle('Recent Services'),
+                      _sectionTitle("Today's Service Schedule"),
                       TextButton(
                         onPressed: () => setState(() { _currentIndex = 2; _vehTab = 2; }),
                         child: const Text('See all', style: TextStyle(fontSize: 12, color: Color(0xFF003087)))),
@@ -416,16 +416,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         padding: EdgeInsets.all(24),
                         child: CircularProgressIndicator(),
                       ))
-                    else if (recentServices.isEmpty)
+                    else if (allServices.where((s) => (s['date'] as String? ?? '') == todayFormatted).isEmpty)
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
                           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)]),
-                        child: const Center(child: Text('No services yet.',
+                        child: const Center(child: Text('No services scheduled for today.',
                           style: TextStyle(color: Color(0xFF718096), fontSize: 13))),
                       )
                     else
-                      ...recentServices.map((s) {
+                      ...allServices.where((s) => (s['date'] as String? ?? '') == todayFormatted).map((s) {
                         final rows = s['svcRows'] as List?;
                         final serviceName = (rows != null && rows.isNotEmpty)
                             ? (rows.first['name'] as String? ?? '—')
@@ -433,7 +433,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         return _serviceRow(
                           s['plate'] as String? ?? '—',
                           serviceName,
-                          s['date'] as String? ?? '—',
+                          s['mechanic'] as String? ?? '—',
                           s['status'] as String? ?? '—',
                         );
                       }),
@@ -468,7 +468,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Widget _serviceRow(String plate, String service, String time, String status) {
+  Widget _serviceRow(String plate, String service, String mechanic, String status) {
     final statusColor = status == 'Completed' ? Colors.green
         : status == 'Ongoing' ? Colors.orange
         : status == 'Pending' ? const Color(0xFF718096)
@@ -490,7 +490,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(plate, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-          Text('$service • $time', style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
+          Text('$service • $mechanic', style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
         ])),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -736,7 +736,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           const SizedBox(width: 12),
                           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                             Text(t['item']!, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                            Text(t['desc']!, style: const TextStyle(fontSize: 11, color: Color(0xFF718096)),
+                            Text(
+                              (t['desc']!).replaceAll(RegExp(r'for maintenance SVC-\d+ [—\-] '), 'for ').replaceAll(RegExp(r'for maintenance SVC-\d+'), ''),
+                              style: const TextStyle(fontSize: 11, color: Color(0xFF718096)),
                               maxLines: 1, overflow: TextOverflow.ellipsis),
                             const SizedBox(height: 2),
                             Row(children: [
@@ -1076,8 +1078,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             child: Icon(isService ? Icons.build_outlined : Icons.inventory_2_outlined, color: typeColor, size: 20)),
                           const SizedBox(width: 12),
                           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text(iss['itemName']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                            Text('${iss['plate']} • ${iss['commodityGroup']}', style: const TextStyle(fontSize: 11, color: Color(0xFF4a5568))),
+                            Text(iss['plate']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                            Text('${iss['itemName']} • ${iss['commodityGroup']}', style: const TextStyle(fontSize: 11, color: Color(0xFF4a5568))),
                             Row(children: [
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),

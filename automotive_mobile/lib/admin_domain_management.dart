@@ -169,10 +169,23 @@ class _DomainDetailScreenState extends State<_DomainDetailScreen> {
                   try {
                     if (doc == null) {
                       await _col.add({'name': name, 'createdAt': FieldValue.serverTimestamp()});
+                      if (context.mounted) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Row(children: const [Icon(Icons.check_circle_outline, color: Colors.white, size: 18), SizedBox(width: 8), Text('Item added successfully!')]),
+                          backgroundColor: Colors.green, behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
+                      }
                     } else {
                       await doc.reference.update({'name': name});
+                      if (context.mounted) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Row(children: const [Icon(Icons.check_circle_outline, color: Colors.white, size: 18), SizedBox(width: 8), Text('Item updated successfully!')]),
+                          backgroundColor: Colors.green, behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
+                      }
                     }
-                    if (context.mounted) Navigator.pop(context);
                   } catch (e) {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -201,7 +214,16 @@ class _DomainDetailScreenState extends State<_DomainDetailScreen> {
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              await doc.reference.delete();
+              try {
+                await doc.reference.delete();
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Row(children: const [Icon(Icons.check_circle_outline, color: Colors.white, size: 18), SizedBox(width: 8), Text('Item deleted successfully!')]),
+                  backgroundColor: Colors.red, behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
+              } catch (e) {
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+              }
             },
             child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),

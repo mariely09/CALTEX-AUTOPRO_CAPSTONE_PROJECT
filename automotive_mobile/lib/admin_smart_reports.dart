@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AdminSmartReports extends StatefulWidget {
   const AdminSmartReports({super.key});
@@ -15,25 +16,72 @@ class _AdminSmartReportsState extends State<AdminSmartReports> {
   final _scrollCtrl = ScrollController();
   final List<_ChatMessage> _messages = [];
 
-  // Sample data for query processing
-  static const _assets = [
-    {'plate': 'ABC-1234', 'desc': 'Isuzu Truck NQR 2021', 'owner': 'Juan Dela Cruz', 'status': 'active', 'nextPMS': '2026-02-15'},
-    {'plate': 'XYZ-5678', 'desc': 'Toyota Hilux 2020', 'owner': 'Pedro Santos', 'status': 'maintenance', 'nextPMS': '2026-04-10'},
-    {'plate': 'DEF-9012', 'desc': 'Mitsubishi L300 2019', 'owner': 'Jose Reyes', 'status': 'active', 'nextPMS': '2026-03-01'},
-  ];
+  // Live data loaded from Firestore
+  List<Map<String, dynamic>> _assets = [];
+  List<Map<String, dynamic>> _inventory = [];
+  List<Map<String, dynamic>> _services = [];
+  bool _dataLoaded = false;
 
-  static const _inventory = [
-    {'num': 'ITM-001', 'name': 'Engine Oil 10W-40', 'stock': 24, 'min': 10, 'unit': 'L'},
-    {'num': 'ITM-002', 'name': 'Oil Filter', 'stock': 3, 'min': 5, 'unit': 'pcs'},
-    {'num': 'ITM-003', 'name': 'Brake Pads', 'stock': 8, 'min': 4, 'unit': 'set'},
-    {'num': 'ITM-004', 'name': 'Air Filter', 'stock': 2, 'min': 5, 'unit': 'pcs'},
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
 
-  static const _services = [
-    {'plate': 'ABC-1234', 'desc': 'Change Oil', 'cost': 2500, 'status': 'Completed'},
-    {'plate': 'XYZ-5678', 'desc': 'Brake Inspection', 'cost': 1800, 'status': 'Ongoing'},
-    {'plate': 'DEF-9012', 'desc': 'PMS Service', 'cost': 3200, 'status': 'Pending'},
-  ];
+  Future<void> _loadData() async {
+    final results = await Future.wait([
+      FirebaseFirestore.instance.collection('vehicles').get(),
+      FirebaseFirestore.instance.collection('stock_inventory').get(),
+      FirebaseFirestore.instance.collection('maintenance')
+          .orderBy('createdAt', descending: true).limit(100).get(),
+    ]);
+
+    final now = DateTime.now();
+
+    _assets = results[0].docs.map((d) {
+      final data = d.data() as Map<String, dynamic>;
+      final lastSvcDate = data['lastSvcDate'] as String? ?? '';
+      final svcFreq = data['svcFreq'] as String? ?? '';
+      final lastDate = DateTime.tryParse(lastSvcDate);
+      final months = int.tryParse(svcFreq);
+      String nextPMS = '';
+      if (lastDate != null && months != null) {
+        final next = DateTime(lastDate.year, lastDate.month + months, lastDate.day);
+        nextPMS = next.toIso8601String();
+      }
+      return {
+        'plate': data['plate'] as String? ?? '',
+        'desc': data['desc'] as String? ?? '',
+        'owner': data['owner'] as String? ?? '',
+        'status': (data['status'] as String? ?? 'active').toLowerCase(),
+        'nextPMS': nextPMS,
+      };
+    }).toList();
+
+    _inventory = results[1].docs.map((d) {
+      final data = d.data() as Map<String, dynamic>;
+      return {
+        'num': data['num'] as String? ?? '',
+        'name': data['name'] as String? ?? '',
+        'stock': (data['stock'] as num?)?.toInt() ?? 0,
+        'min': (data['min'] as num?)?.toInt() ?? 0,
+        'unit': data['uom'] as String? ?? '',
+      };
+    }).toList();
+
+    _services = results[2].docs.map((d) {
+      final data = d.data() as Map<String, dynamic>;
+      final costStr = (data['cost'] as String? ?? '0').replaceAll('₱', '').replaceAll(',', '');
+      return {
+        'plate': data['plate'] as String? ?? '',
+        'desc': data['desc'] as String? ?? '',
+        'cost': double.tryParse(costStr) ?? 0.0,
+        'status': data['status'] as String? ?? '',
+      };
+    }).toList();
+
+    if (mounted) setState(() => _dataLoaded = true);
+  }
 
   @override
   void dispose() {
@@ -54,6 +102,11 @@ class _AdminSmartReportsState extends State<AdminSmartReports> {
   void _sendQuery([String? preset]) {
     final text = preset ?? _inputCtrl.text.trim();
     if (text.isEmpty) return;
+    if (!_dataLoaded) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Loading data, please wait...'), duration: Duration(seconds: 1)));
+      return;
+    }
     setState(() {
       _messages.add(_ChatMessage(role: 'user', text: text));
       _inputCtrl.clear();
@@ -71,8 +124,9 @@ class _AdminSmartReportsState extends State<AdminSmartReports> {
     final q = query.toLowerCase();
 
     // Under maintenance
-    if (q.contains('under maintenance') || q.contains('being maintained') || q.contains('currently') && q.contains('maintenance')) {
-      final list = _assets.where((a) => a['status'] == 'maintenance').toList();
+    if (q.contains('under maintenance') || (q.contains('currently') && q.contains('maintenance'))) {
+      final list = _assets.where((a) =>
+        (a['status'] as String).toLowerCase().contains('maintenance')).toList();
       if (list.isEmpty) return _QueryResult(type: 'success', icon: '✅', title: 'Assets Under Maintenance', body: 'No assets are currently under maintenance.', rows: []);
       return _QueryResult(type: 'blue', icon: '🔵', title: 'Assets Under Maintenance',
         body: '${list.length} asset(s) are currently under maintenance.',
@@ -83,8 +137,8 @@ class _AdminSmartReportsState extends State<AdminSmartReports> {
     if (q.contains('overdue') || q.contains('past due') || q.contains('missed')) {
       final now = DateTime.now();
       final list = _assets.where((a) {
-        final due = DateTime.tryParse(a['nextPMS'] as String);
-        return due != null && due.isBefore(now) && a['status'] != 'maintenance';
+        final due = DateTime.tryParse(a['nextPMS'] as String? ?? '');
+        return due != null && due.isBefore(now);
       }).toList();
       if (list.isEmpty) return _QueryResult(type: 'success', icon: '✅', title: 'PMS Overdue', body: 'No assets are overdue for PMS.', rows: []);
       return _QueryResult(type: 'danger', icon: '⚠️', title: 'Assets with PMS Overdue',
@@ -97,10 +151,10 @@ class _AdminSmartReportsState extends State<AdminSmartReports> {
     }
 
     // PMS due soon
-    if (q.contains('due soon') || q.contains('upcoming') || q.contains('pms') && q.contains('schedule')) {
+    if (q.contains('due soon') || q.contains('upcoming') || (q.contains('pms') && q.contains('schedule'))) {
       final now = DateTime.now();
       final list = _assets.where((a) {
-        final due = DateTime.tryParse(a['nextPMS'] as String);
+        final due = DateTime.tryParse(a['nextPMS'] as String? ?? '');
         if (due == null) return false;
         final diff = due.difference(now).inDays;
         return diff >= 0 && diff <= 30;
@@ -126,17 +180,17 @@ class _AdminSmartReportsState extends State<AdminSmartReports> {
 
     // Total cost / monthly cost
     if (q.contains('cost') || q.contains('expense') || q.contains('repair cost') || q.contains('monthly')) {
-      final total = _services.fold<int>(0, (sum, s) => sum + (s['cost'] as int));
-      return _QueryResult(type: 'blue', icon: '💰', title: 'Total Repair Cost This Month',
+      final total = _services.fold<double>(0, (sum, s) => sum + (s['cost'] as double));
+      return _QueryResult(type: 'blue', icon: '💰', title: 'Total Repair Cost',
         body: 'Total maintenance cost across all service transactions.',
         rows: [
-          ..._services.map((s) => _Row(label: '${s['plate']} – ${s['desc']}', value: '₱${(s['cost'] as int).toStringAsFixed(0)}')),
-          _Row(label: 'TOTAL', value: '₱$total', isBold: true),
+          ..._services.map((s) => _Row(label: '${s['plate']} – ${s['desc']}', value: '₱${(s['cost'] as double).toStringAsFixed(2)}')),
+          _Row(label: 'TOTAL', value: '₱${total.toStringAsFixed(2)}', isBold: true),
         ]);
     }
 
     // Asset list
-    if (q.contains('list') && (q.contains('asset') || q.contains('vehicle')) || q.contains('all vehicle') || q.contains('fleet')) {
+    if ((q.contains('list') && (q.contains('asset') || q.contains('vehicle'))) || q.contains('all vehicle') || q.contains('fleet')) {
       return _QueryResult(type: 'blue', icon: '🚗', title: 'All Vehicles',
         body: '${_assets.length} vehicle(s) registered in the system.',
         rows: _assets.map((a) => _Row(label: '${a['plate']} – ${a['desc']}', value: a['owner'] as String)).toList());
@@ -189,7 +243,13 @@ class _AdminSmartReportsState extends State<AdminSmartReports> {
       body: Column(children: [
         // Chat area
         Expanded(
-          child: _messages.isEmpty ? _buildWelcome() : ListView.builder(
+          child: !_dataLoaded
+            ? const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 12),
+                Text('Loading fleet data...', style: TextStyle(color: Color(0xFF718096), fontSize: 13)),
+              ]))
+            : _messages.isEmpty ? _buildWelcome() : ListView.builder(
             controller: _scrollCtrl,
             padding: const EdgeInsets.all(16),
             itemCount: _messages.length,

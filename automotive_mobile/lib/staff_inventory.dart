@@ -417,7 +417,13 @@ class _StaffInventoryState extends State<StaffInventory> {
                               'status': newStock >= min ? 'OK' : 'Low',
                               'updatedAt': FieldValue.serverTimestamp(),
                             });
-                            if (context.mounted) Navigator.pop(context);
+                            if (context.mounted) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                content: Row(children: const [Icon(Icons.check_circle_outline, color: Colors.white, size: 18), SizedBox(width: 8), Text('Stock received successfully!')]),
+                                backgroundColor: Colors.green, behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
+                            }
                           } catch (e) {
                             if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));

@@ -39,6 +39,7 @@ dependencies:
   shared_preferences: ^2.5.5
   mobile_scanner: ^5.2.3
   image_picker: ^1.1.2
+  url_launcher: ^6.3.0
   printing: ^5.13.1
   pdf: ^3.10.8
   firebase_core: ^3.6.0
@@ -48,6 +49,7 @@ dependencies:
   barcode_widget: ^2.0.4
   qr_flutter: ^4.1.0
   google_sign_in: ^6.2.1
+  cloud_functions: ^5.6.2
 
 dev_dependencies:
   flutter_test:

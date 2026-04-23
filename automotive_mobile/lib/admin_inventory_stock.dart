@@ -520,7 +520,13 @@ class _AdminInventoryStockState extends State<AdminInventoryStock> {
                               'status': newStock >= min ? 'OK' : 'Low',
                               'updatedAt': FieldValue.serverTimestamp(),
                             });
-                            if (context.mounted) Navigator.pop(context);
+                            if (context.mounted) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                content: Row(children: const [Icon(Icons.check_circle_outline, color: Colors.white, size: 18), SizedBox(width: 8), Text('Stock received successfully!')]),
+                                backgroundColor: Colors.green, behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
+                            }
                           } catch (e) {
                             if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
@@ -642,7 +648,13 @@ class _AdminInventoryStockState extends State<AdminInventoryStock> {
                             'status': stock >= min ? 'OK' : 'Low',
                             'updatedAt': FieldValue.serverTimestamp(),
                           });
-                          if (sheetCtx.mounted) Navigator.pop(sheetCtx);
+                          if (sheetCtx.mounted) {
+                            Navigator.pop(sheetCtx);
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                              content: Row(children: const [Icon(Icons.check_circle_outline, color: Colors.white, size: 18), SizedBox(width: 8), Text('Stock updated successfully!')]),
+                              backgroundColor: Colors.green, behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
+                          }
                         } catch (e) {
                           if (sheetCtx.mounted) ScaffoldMessenger.of(sheetCtx).showSnackBar(
                             SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
@@ -829,7 +841,13 @@ class _AdminInventoryStockState extends State<AdminInventoryStock> {
                                     return;
                                   }
                                   await _db.add(data);
-                                  if (context.mounted) Navigator.pop(context);
+                                  if (context.mounted) {
+                                    Navigator.pop(context);
+                                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                      content: Row(children: const [Icon(Icons.check_circle_outline, color: Colors.white, size: 18), SizedBox(width: 8), Text('Stock item added successfully!')]),
+                                      backgroundColor: Colors.green, behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
+                                  }
                                 } catch (e) {
                                   if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
@@ -875,6 +893,10 @@ class _AdminInventoryStockState extends State<AdminInventoryStock> {
               Navigator.pop(context);
               try {
                 await _db.doc(item['id'] as String).delete();
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Row(children: const [Icon(Icons.check_circle_outline, color: Colors.white, size: 18), SizedBox(width: 8), Text('Stock item deleted successfully!')]),
+                  backgroundColor: Colors.red, behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
               } catch (e) {
                 if (mounted) ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));

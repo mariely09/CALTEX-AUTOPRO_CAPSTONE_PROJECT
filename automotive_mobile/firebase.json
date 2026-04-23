@@ -1,1 +1,25 @@
-{"flutter":{"platforms":{"dart":{"lib/firebase_options.dart":{"projectId":"caltex-autopro-1e664","configurations":{"android":"1:930140433367:android:ce9c87496ef3d19b22b992","ios":"1:930140433367:ios:32dcc67f189f112a22b992"}}},"android":{"default":{"projectId":"caltex-autopro-1e664","appId":"1:930140433367:android:ce9c87496ef3d19b22b992","fileOutput":"android/app/google-services.json"}}}}}
+{
+  "functions": {
+    "source": "functions"
+  },
+  "flutter": {
+    "platforms": {
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "caltex-autopro-1e664",
+          "configurations": {
+            "android": "1:930140433367:android:ce9c87496ef3d19b22b992",
+            "ios": "1:930140433367:ios:32dcc67f189f112a22b992"
+          }
+        }
+      },
+      "android": {
+        "default": {
+          "projectId": "caltex-autopro-1e664",
+          "appId": "1:930140433367:android:ce9c87496ef3d19b22b992",
+          "fileOutput": "android/app/google-services.json"
+        }
+      }
+    }
+  }
+}

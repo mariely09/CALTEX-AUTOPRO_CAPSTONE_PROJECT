@@ -489,6 +489,21 @@ class _StaffVehicleListState extends State<StaffVehicleList> {
                         try {
                           if (isEdit) {
                             await _db.doc(vehicle!['id']).update(data);
+                            if (sheetCtx.mounted) {
+                              Navigator.pop(sheetCtx);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Row(children: const [
+                                    Icon(Icons.check_circle_outline, color: Colors.white, size: 18),
+                                    SizedBox(width: 8),
+                                    Text('Vehicle updated successfully!'),
+                                  ]),
+                                  backgroundColor: Colors.green,
+                                  behavior: SnackBarBehavior.floating,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                              );
+                            }
                           } else {
                             final existing = await _db
                                 .where('plate', isEqualTo: plateCtrl.text.trim().toUpperCase())
@@ -502,8 +517,22 @@ class _StaffVehicleListState extends State<StaffVehicleList> {
                             }
                             data['createdAt'] = FieldValue.serverTimestamp();
                             await _db.add(data);
+                            if (sheetCtx.mounted) {
+                              Navigator.pop(sheetCtx);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Row(children: const [
+                                    Icon(Icons.check_circle_outline, color: Colors.white, size: 18),
+                                    SizedBox(width: 8),
+                                    Text('Vehicle added successfully!'),
+                                  ]),
+                                  backgroundColor: Colors.green,
+                                  behavior: SnackBarBehavior.floating,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                              );
+                            }
                           }
-                          if (sheetCtx.mounted) Navigator.pop(sheetCtx);
                         } catch (e) {
                           if (sheetCtx.mounted) ScaffoldMessenger.of(sheetCtx).showSnackBar(
                             SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));

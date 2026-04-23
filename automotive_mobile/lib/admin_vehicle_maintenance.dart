@@ -336,10 +336,16 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
                         } else {
                           await vSnap.docs.first.reference.update({'status': 'Under Maintenance'});
                         }
-                        if (mounted) Navigator.pop(context);
+                        if (mounted) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Row(children: const [Icon(Icons.check_circle_outline, color: Colors.white, size: 18), SizedBox(width: 8), Text('Service approved — status set to Ongoing!')]),
+                            backgroundColor: Colors.orange, behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
+                        }
                       },
                       icon: const Icon(Icons.check_circle_outline, size: 16),
-                      label: const Text('Approve → Ongoing'),
+                      label: const Text('Approve - Ongoing'),
                       style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white),
                     )),
                 if (s['status'] == 'Ongoing') ...[
@@ -470,7 +476,13 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
                             'lastSvcDate': '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}',
                           });
                         }
-                        if (mounted) Navigator.pop(context);
+                        if (mounted) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Row(children: const [Icon(Icons.check_circle_outline, color: Colors.white, size: 18), SizedBox(width: 8), Text('Service marked as Completed!')]),
+                            backgroundColor: Colors.green, behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
+                        }
                       },
                       icon: const Icon(Icons.done_all, size: 16),
                       label: const Text('Mark as Completed'),
@@ -738,6 +750,26 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
                       Expanded(child: ElevatedButton(
                         onPressed: () async {
                           if (plateCtrl.text.trim().isEmpty || mechanicCtrl.text.trim().isEmpty) return;
+
+                          // Validate material quantities against stock
+                          for (final r in matRows) {
+                            final name = r['name']!.text.trim();
+                            final qty = int.tryParse(r['qty']!.text.trim()) ?? 0;
+                            if (name.isEmpty || qty <= 0) continue;
+                            final stockSnap = await FirebaseFirestore.instance
+                                .collection('stock_inventory').where('name', isEqualTo: name).limit(1).get();
+                            if (stockSnap.docs.isNotEmpty) {
+                              final available = (stockSnap.docs.first['stock'] as num?)?.toInt() ?? 0;
+                              if (qty > available) {
+                                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                  content: Text('Insufficient stock for "$name". Available: $available, Requested: $qty'),
+                                  backgroundColor: Colors.orange, behavior: SnackBarBehavior.floating,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
+                                return;
+                              }
+                            }
+                          }
+
                           final svcId = isEdit ? service!['id'] as String : await _nextSvcId();
                           final data = <String, dynamic>{
                             'id': svcId,
@@ -753,11 +785,24 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
                           try {
                             if (isEdit) {
                               await _db.doc(service!['docId'] as String).update(data);
+                              if (context.mounted) {
+                                Navigator.pop(context);
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                  content: Row(children: const [Icon(Icons.check_circle_outline, color: Colors.white, size: 18), SizedBox(width: 8), Text('Service updated successfully!')]),
+                                  backgroundColor: Colors.green, behavior: SnackBarBehavior.floating,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
+                              }
                             } else {
                               data['createdAt'] = FieldValue.serverTimestamp();
                               await _db.add(data);
+                              if (context.mounted) {
+                                Navigator.pop(context);
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                  content: Row(children: const [Icon(Icons.check_circle_outline, color: Colors.white, size: 18), SizedBox(width: 8), Text('Service added successfully!')]),
+                                  backgroundColor: Colors.green, behavior: SnackBarBehavior.floating,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
+                              }
                             }
-                            if (context.mounted) Navigator.pop(context);
                           } catch (e) {
                             if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
@@ -821,7 +866,10 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
 
   Widget _matRow(Map<String, TextEditingController> row, VoidCallback onRemove, StateSetter setModal, BuildContext ctx) {
     final scanCtrl = TextEditingController();
-    void lookup(String query) {
+    // row['maxStock'] is a special key storing available stock as a TextEditingController with numeric text
+    row.putIfAbsent('maxStock', () => TextEditingController(text: '99999'));
+
+    void lookup(String query) async {
       final q = query.trim().toLowerCase();
       if (q.isEmpty) return;
       for (final entry in _itemMasterMap.entries) {
@@ -831,12 +879,25 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
           row['uom']!.text = d['uom'] as String? ?? '';
           row['cost']!.text = (d['cost'] as String? ?? '0').replaceAll('₱', '');
           if (row['qty']!.text.isEmpty) row['qty']!.text = '1';
+          // Fetch available stock
+          final stockSnap = await FirebaseFirestore.instance
+              .collection('stock_inventory').where('name', isEqualTo: entry.key).limit(1).get();
+          final available = stockSnap.docs.isNotEmpty
+              ? (stockSnap.docs.first['stock'] as num?)?.toInt() ?? 99999
+              : 99999;
+          row['maxStock']!.text = '$available';
+          // Clamp current qty
+          final currentQty = int.tryParse(row['qty']!.text) ?? 1;
+          if (currentQty > available) row['qty']!.text = '$available';
           setModal(() {}); return;
         }
       }
       row['name']!.text = ''; row['uom']!.text = ''; row['cost']!.text = '';
+      row['maxStock']!.text = '99999';
       setModal(() {});
     }
+
+    final maxStock = int.tryParse(row['maxStock']!.text) ?? 99999;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -881,9 +942,30 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
               ]),
               const SizedBox(height: 4),
               Text('UOM: ${row['uom']!.text}  •  Unit Cost: ₱${row['cost']!.text}', style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
+              const SizedBox(height: 4),
+              Text('Available stock: $maxStock', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                color: maxStock == 0 ? Colors.red : maxStock <= 5 ? Colors.orange : Colors.green)),
               const SizedBox(height: 8),
-              TextField(controller: row['qty'], keyboardType: TextInputType.number, onChanged: (_) => setModal(() {}),
-                decoration: const InputDecoration(labelText: 'Quantity *', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8), isDense: true)),
+              TextField(
+                controller: row['qty'],
+                keyboardType: TextInputType.number,
+                enabled: maxStock > 0,
+                onChanged: (v) {
+                  final entered = int.tryParse(v) ?? 0;
+                  if (entered > maxStock) {
+                    row['qty']!.text = '$maxStock';
+                    row['qty']!.selection = TextSelection.collapsed(offset: '$maxStock'.length);
+                  }
+                  setModal(() {});
+                },
+                decoration: InputDecoration(
+                  labelText: 'Quantity * (max $maxStock)',
+                  border: const OutlineInputBorder(),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  isDense: true,
+                  errorText: maxStock == 0 ? 'Out of stock' : null,
+                ),
+              ),
             ]),
           ),
         ],
@@ -918,6 +1000,10 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
               Navigator.pop(context);
               try {
                 await _db.doc(s['docId'] as String).delete();
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Row(children: const [Icon(Icons.check_circle_outline, color: Colors.white, size: 18), SizedBox(width: 8), Text('Service deleted successfully!')]),
+                  backgroundColor: Colors.red, behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
               } catch (e) {
                 if (mounted) ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));

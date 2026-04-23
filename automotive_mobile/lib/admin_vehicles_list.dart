@@ -430,6 +430,21 @@ class _AdminVehiclesListState extends State<AdminVehiclesList> {
                         try {
                           if (isEdit) {
                             await _db.doc(vehicle!['id']).update(data);
+                            if (sheetCtx.mounted) {
+                              Navigator.pop(sheetCtx);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Row(children: const [
+                                    Icon(Icons.check_circle_outline, color: Colors.white, size: 18),
+                                    SizedBox(width: 8),
+                                    Text('Vehicle updated successfully!'),
+                                  ]),
+                                  backgroundColor: Colors.green,
+                                  behavior: SnackBarBehavior.floating,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                              );
+                            }
                           } else {
                             // Check for duplicate plate
                             final existing = await _db
@@ -444,9 +459,22 @@ class _AdminVehiclesListState extends State<AdminVehiclesList> {
                             }
                             data['createdAt'] = FieldValue.serverTimestamp();
                             await _db.add(data);
-                          }
-                          if (sheetCtx.mounted) Navigator.pop(sheetCtx);
-                        } catch (e) {
+                            if (sheetCtx.mounted) {
+                              Navigator.pop(sheetCtx);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Row(children: const [
+                                    Icon(Icons.check_circle_outline, color: Colors.white, size: 18),
+                                    SizedBox(width: 8),
+                                    Text('Vehicle added successfully!'),
+                                  ]),
+                                  backgroundColor: Colors.green,
+                                  behavior: SnackBarBehavior.floating,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                              );
+                            }
+                          }                        } catch (e) {
                           if (sheetCtx.mounted) ScaffoldMessenger.of(sheetCtx).showSnackBar(
                             SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
                         }
@@ -476,6 +504,18 @@ class _AdminVehiclesListState extends State<AdminVehiclesList> {
               Navigator.pop(context);
               try {
                 await _db.doc(v['id']).delete();
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Row(children: const [
+                      Icon(Icons.check_circle_outline, color: Colors.white, size: 18),
+                      SizedBox(width: 8),
+                      Text('Vehicle deleted successfully!'),
+                    ]),
+                    backgroundColor: Colors.red,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                );
               } catch (e) {
                 if (mounted) ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));

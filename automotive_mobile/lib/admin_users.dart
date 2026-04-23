@@ -1,6 +1,15 @@
+import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:http/http.dart' as http;
+import 'firebase_options.dart';
+
+const _welcomeEmailjsServiceId  = 'service_i906b4o';
+const _welcomeEmailjsTemplateId = 'template_ovrow3w';
+const _welcomeEmailjsPublicKey  = 'DqRrjCkUnf9w2L_sv';
 
 class AdminUsers extends StatefulWidget {
   const AdminUsers({super.key});
@@ -29,6 +38,46 @@ class _AdminUsersState extends State<AdminUsers> {
 
   String _roleLabel(String role) =>
       role[0].toUpperCase() + role.substring(1);
+
+  String _generateTempPassword() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    final rand = Random.secure();
+    final base = List.generate(8, (_) => chars[rand.nextInt(chars.length)]).join();
+    return '${base}@1'; // ensures uppercase, lowercase, digit, special char
+  }
+
+  Future<bool> _sendWelcomeEmail({
+    required String toEmail,
+    required String toName,
+    required String tempPassword,
+    required String role,
+  }) async {
+    try {
+      final res = await http.post(
+        Uri.parse('https://api.emailjs.com/api/v1.0/email/send'),
+        headers: {
+          'Content-Type': 'application/json',
+          'origin': 'https://dashboard.emailjs.com',
+        },
+        body: jsonEncode({
+          'service_id':  _welcomeEmailjsServiceId,
+          'template_id': _welcomeEmailjsTemplateId,
+          'user_id':     _welcomeEmailjsPublicKey,
+          'template_params': {
+            'to_email':      toEmail,
+            'to_name':       toName,
+            'temp_password': tempPassword,
+            'role':          role,
+          },
+        }),
+      );
+      debugPrint('Welcome email ${res.statusCode}: ${res.body}');
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('Welcome email error: $e');
+      return false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -253,139 +302,276 @@ class _AdminUsersState extends State<AdminUsers> {
 
   void _showAddUserModal({Map<String, String>? user}) {
     final isEdit = user != null;
-    final nameCtrl = TextEditingController(text: user?['name'] ?? '');
+    final nameCtrl     = TextEditingController(text: user?['name']     ?? '');
     final usernameCtrl = TextEditingController(text: user?['username'] ?? '');
-    final emailCtrl = TextEditingController(text: user?['email'] ?? '');
-    final passCtrl = TextEditingController();
-    String selectedRole = isEdit
+    final emailCtrl    = TextEditingController(text: user?['email']    ?? '');
+    String selectedRole   = isEdit
         ? (user!['role']![0].toUpperCase() + user['role']!.substring(1))
         : 'Staff';
     String selectedStatus = user?['status'] ?? 'Active';
+    bool saving = false;
 
     showModalBottomSheet(
-      context: context, isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) {
-        bool obscurePass = true;
-        return StatefulBuilder(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => StatefulBuilder(
         builder: (ctx, setModal) => DraggableScrollableSheet(
-          expand: false, initialChildSize: 0.9, maxChildSize: 0.97,
+          expand: false,
+          initialChildSize: 0.85,
+          maxChildSize: 0.97,
           builder: (_, ctrl) => SingleChildScrollView(
             controller: ctrl,
             child: Column(children: [
+              // ── Header ──
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-                decoration: const BoxDecoration(color: _red, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+                decoration: const BoxDecoration(
+                    color: _red,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
                 child: Row(children: [
-                  Container(width: 44, height: 44,
-                    decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(12)),
-                    child: Icon(isEdit ? Icons.edit_outlined : Icons.person_add_outlined, color: Colors.white, size: 22)),
+                  Container(
+                    width: 44, height: 44,
+                    decoration: BoxDecoration(
+                        color: Colors.white24,
+                        borderRadius: BorderRadius.circular(12)),
+                    child: Icon(
+                        isEdit ? Icons.edit_outlined : Icons.person_add_outlined,
+                        color: Colors.white, size: 22)),
                   const SizedBox(width: 12),
-                  Expanded(child: Text(isEdit ? 'Edit User' : 'Add User',
-                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))),
-                  GestureDetector(onTap: () => Navigator.pop(context),
-                    child: const Icon(Icons.close, color: Colors.white)),
+                  Expanded(child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(isEdit ? 'Edit User' : 'Add User',
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold)),
+                      if (!isEdit)
+                        const Text(
+                            'Login credentials will be sent to the user\'s email.',
+                            style: TextStyle(color: Colors.white70, fontSize: 11)),
+                    ],
+                  )),
+                  GestureDetector(
+                      onTap: () => Navigator.pop(ctx),
+                      child: const Icon(Icons.close, color: Colors.white)),
                 ]),
               ),
+
+              // ── Form ──
               Padding(
-                padding: EdgeInsets.only(left: 20, right: 20, top: 20,
-                  bottom: MediaQuery.of(context).viewInsets.bottom + 24),
+                padding: EdgeInsets.only(
+                    left: 20, right: 20, top: 20,
+                    bottom: MediaQuery.of(ctx).viewInsets.bottom + 24),
                 child: Column(children: [
-                  TextField(controller: nameCtrl,
-                    decoration: const InputDecoration(labelText: 'Full Name *', border: OutlineInputBorder())),
-                  const SizedBox(height: 10),
-                  TextField(controller: usernameCtrl,
-                    decoration: const InputDecoration(labelText: 'Username *', border: OutlineInputBorder())),
-                  const SizedBox(height: 10),
-                  TextField(controller: emailCtrl,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(labelText: 'Email *', border: OutlineInputBorder())),
-                  const SizedBox(height: 10),
-                  Theme(
-                    data: Theme.of(context).copyWith(
-                      inputDecorationTheme: const InputDecorationTheme(
-                        contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                      ),
-                    ),
-                    child: DropdownButtonFormField<String>(
-                      value: selectedRole,
-                      isExpanded: true,
-                      decoration: const InputDecoration(labelText: 'Role *', border: OutlineInputBorder()),
-                      items: const [
-                        DropdownMenuItem(value: 'Admin', child: Text('Admin')),
-                        DropdownMenuItem(value: 'Staff', child: Text('Staff')),
-                        DropdownMenuItem(value: 'Customer', child: Text('Customer')),
-                      ],
-                      onChanged: (v) => setModal(() => selectedRole = v!),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
+                  TextField(
+                    controller: nameCtrl,
+                    decoration: const InputDecoration(
+                        labelText: 'Full Name *',
+                        border: OutlineInputBorder())),
                   const SizedBox(height: 10),
                   TextField(
-                    controller: passCtrl,
-                    obscureText: obscurePass,
-                    decoration: InputDecoration(
-                      labelText: isEdit ? 'New Password (leave blank to keep)' : 'Password *',
-                      border: const OutlineInputBorder(),
-                      suffixIcon: IconButton(
-                        icon: Icon(obscurePass ? Icons.visibility_off : Icons.visibility, size: 20),
-                        onPressed: () => setModal(() => obscurePass = !obscurePass),
-                      ),
-                    ),
+                    controller: usernameCtrl,
+                    decoration: const InputDecoration(
+                        labelText: 'Username *',
+                        border: OutlineInputBorder())),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: emailCtrl,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(
+                        labelText: 'Email *',
+                        border: OutlineInputBorder())),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    value: selectedRole,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                        labelText: 'Role *',
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 14)),
+                    items: const [
+                      DropdownMenuItem(value: 'Admin',    child: Text('Admin')),
+                      DropdownMenuItem(value: 'Staff',    child: Text('Staff')),
+                      DropdownMenuItem(value: 'Customer', child: Text('Customer')),
+                    ],
+                    onChanged: (v) => setModal(() => selectedRole = v!),
+                    borderRadius: BorderRadius.circular(10),
                   ),
+                  if (!isEdit) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FFF4),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.green.shade200),
+                      ),
+                      child: const Row(children: [
+                        Icon(Icons.email_outlined, size: 16, color: Colors.green),
+                        SizedBox(width: 8),
+                        Expanded(child: Text(
+                          'A temporary password will be auto-generated and sent to the user\'s email.',
+                          style: TextStyle(fontSize: 11, color: Colors.green),
+                        )),
+                      ]),
+                    ),
+                  ],
                   const SizedBox(height: 20),
+
+                  // ── Buttons ──
                   Row(children: [
                     Expanded(child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel'))),
+                      onPressed: saving ? null : () => Navigator.pop(ctx),
+                      child: const Text('Cancel'),
+                    )),
                     const SizedBox(width: 12),
                     Expanded(child: ElevatedButton(
-                      onPressed: () async {
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: _red,
+                          foregroundColor: Colors.white),
+                      onPressed: saving ? null : () async {
+                        // Validate
                         if (nameCtrl.text.trim().isEmpty ||
                             usernameCtrl.text.trim().isEmpty ||
-                            emailCtrl.text.trim().isEmpty) return;
-                        if (!isEdit && passCtrl.text.trim().isEmpty) return;
+                            emailCtrl.text.trim().isEmpty) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
+                            content: Text('Please fill in all required fields.'),
+                            backgroundColor: Colors.orange));
+                          return;
+                        }
+
+                        setModal(() => saving = true);
+
                         try {
                           if (isEdit) {
+                            // ── Edit existing user ──
                             await FirebaseFirestore.instance
                                 .collection('users')
                                 .doc(user!['uid'])
                                 .update({
-                              'name': nameCtrl.text.trim(),
+                              'name':     nameCtrl.text.trim(),
                               'username': usernameCtrl.text.trim(),
-                              'email': emailCtrl.text.trim(),
-                              'role': selectedRole.toLowerCase(),
-                              'status': selectedStatus,
+                              'email':    emailCtrl.text.trim(),
+                              'role':     selectedRole.toLowerCase(),
+                              'status':   selectedStatus,
                             });
+                            if (ctx.mounted) {
+                              Navigator.pop(ctx);
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                content: const Row(children: [
+                                  Icon(Icons.check_circle_outline,
+                                      color: Colors.white, size: 18),
+                                  SizedBox(width: 8),
+                                  Text('User updated successfully!'),
+                                ]),
+                                backgroundColor: Colors.green,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10)),
+                              ));
+                            }
                           } else {
-                            final cred = await FirebaseAuth.instance
-                                .createUserWithEmailAndPassword(
-                                    email: emailCtrl.text.trim(),
-                                    password: passCtrl.text.trim());
-                            await FirebaseFirestore.instance
-                                .collection('users')
-                                .doc(cred.user!.uid)
-                                .set({
-                              'name': nameCtrl.text.trim(),
-                              'username': usernameCtrl.text.trim(),
-                              'email': emailCtrl.text.trim(),
-                              'role': selectedRole.toLowerCase(),
-                              'status': selectedStatus,
-                              'createdAt': FieldValue.serverTimestamp(),
-                            });
+                            // ── Add new user ──
+                            final tempPass = _generateTempPassword();
+
+                            // Use a secondary Firebase app so the admin
+                            // session is NOT replaced by the new user's session
+                            FirebaseApp? secondaryApp;
+                            try {
+                              secondaryApp = await Firebase.initializeApp(
+                                name: 'secondary_${DateTime.now().millisecondsSinceEpoch}',
+                                options: DefaultFirebaseOptions.currentPlatform,
+                              );
+                              final secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
+
+                              // 1. Create account in secondary app (doesn't touch admin session)
+                              final cred = await secondaryAuth.createUserWithEmailAndPassword(
+                                email: emailCtrl.text.trim(),
+                                password: tempPass,
+                              );
+
+                              // 2. Save to Firestore using the new UID
+                              await FirebaseFirestore.instance
+                                  .collection('users')
+                                  .doc(cred.user!.uid)
+                                  .set({
+                                'name':      nameCtrl.text.trim(),
+                                'username':  usernameCtrl.text.trim(),
+                                'email':     emailCtrl.text.trim(),
+                                'role':      selectedRole.toLowerCase(),
+                                'status':    selectedStatus,
+                                'createdAt': FieldValue.serverTimestamp(),
+                              });
+
+                              // 3. Sign out from secondary app
+                              await secondaryAuth.signOut();
+                            } finally {
+                              // Always delete the secondary app to free resources
+                              await secondaryApp?.delete();
+                            }
+
+                            // 4. Send welcome email
+                            final sent = await _sendWelcomeEmail(
+                              toEmail:      emailCtrl.text.trim(),
+                              toName:       nameCtrl.text.trim(),
+                              tempPassword: tempPass,
+                              role:         selectedRole,
+                            );
+
+                            if (ctx.mounted) {
+                              Navigator.pop(ctx);
+                              // Always show green success — user was created regardless of email
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                content: Row(children: [
+                                  const Icon(Icons.check_circle_outline,
+                                      color: Colors.white, size: 18),
+                                  const SizedBox(width: 8),
+                                  Expanded(child: Text(
+                                      'User added successfully!'
+                                      '${sent ? ' Credentials sent to ${emailCtrl.text.trim()}.' : ' (Email not sent — check EmailJS setup.)'}')),
+                                ]),
+                                backgroundColor: Colors.green,
+                                behavior: SnackBarBehavior.floating,
+                                duration: const Duration(seconds: 5),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10)),
+                              ));
+                            }
                           }
-                          if (context.mounted) Navigator.pop(context);
                         } on FirebaseAuthException catch (e) {
-                          if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(e.message ?? 'Error'), backgroundColor: Colors.red));
+                          if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(
+                            SnackBar(
+                                content: Text(e.code == 'email-already-in-use'
+                                    ? 'This email is already registered. Use a different email.'
+                                    : e.code == 'invalid-email'
+                                        ? 'Invalid email address format.'
+                                        : e.code == 'weak-password'
+                                            ? 'Password is too weak.'
+                                            : e.message ?? 'Firebase error'),
+                                backgroundColor: Colors.red,
+                                behavior: SnackBarBehavior.floating,
+                                duration: const Duration(seconds: 4),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
                         } catch (e) {
-                          if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+                          if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(
+                            SnackBar(
+                                content: Text('Error: $e'),
+                                backgroundColor: Colors.red));
+                        } finally {
+                          if (ctx.mounted) setModal(() => saving = false);
                         }
                       },
-                      style: ElevatedButton.styleFrom(backgroundColor: _red, foregroundColor: Colors.white),
-                      child: Text(isEdit ? '💾 Update' : '💾 Save'),
+                      child: saving
+                          ? const SizedBox(
+                              width: 18, height: 18,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white))
+                          : Text(isEdit ? '💾 Update' : '📧 Add & Send'),
                     )),
                   ]),
                 ]),
@@ -393,8 +579,7 @@ class _AdminUsersState extends State<AdminUsers> {
             ]),
           ),
         ),
-      );
-      },
+      ),
     );
   }
 
@@ -403,17 +588,29 @@ class _AdminUsersState extends State<AdminUsers> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Delete User'),
-        content: Text('Delete "${u['name']}"?'),
+        content: Text('Delete "${u['name']}"? This will remove their account from the app.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
               try {
+                // Delete from Firestore
                 await FirebaseFirestore.instance
                     .collection('users')
                     .doc(u['uid'])
                     .delete();
+
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: const Row(children: [
+                    Icon(Icons.check_circle_outline, color: Colors.white, size: 18),
+                    SizedBox(width: 8),
+                    Expanded(child: Text('User deleted. To fully remove from Firebase Auth, delete them in the Firebase Console → Authentication.')),
+                  ]),
+                  backgroundColor: Colors.green,
+                  behavior: SnackBarBehavior.floating,
+                  duration: const Duration(seconds: 6),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
               } catch (e) {
                 if (mounted) ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));

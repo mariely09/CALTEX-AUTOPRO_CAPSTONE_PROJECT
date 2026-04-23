@@ -3,7 +3,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'login.dart';
 import 'customer_pms_history.dart';
+import 'customer_smart_ai.dart';
 import 'profile.dart';
+import 'notifications.dart';
+import 'customer_bottomnavbar.dart';
 
 class CustomerDashboard extends StatefulWidget {
   const CustomerDashboard({super.key});
@@ -43,19 +46,23 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
     if (mounted) setState(() { _initials = ini; _photoUrl = photo; });
   }
 
-  final List<({IconData icon, String label})> _navItems = const [
-    (icon: Icons.directions_car_outlined, label: 'My Vehicles'),
-    (icon: Icons.smart_toy_outlined, label: 'Smart Reports'),
-    (icon: Icons.notifications_outlined, label: 'Notifications'),
-    (icon: Icons.person_outline, label: 'Profile'),
-  ];
+  // nav items moved to CustomerBottomNavBar
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _bg,
       appBar: _buildTopBar(),
       body: _buildBody(),
-      bottomNavigationBar: _buildBottomNav(),
+      bottomNavigationBar: CustomerBottomNavBar(
+        currentIndex: _currentIndex,
+        onTap: (i) {
+          if (i == 1) {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerSmartAI()));
+          } else {
+            setState(() => _currentIndex = i);
+          }
+        },
+      ),
     );
   }
 
@@ -80,15 +87,21 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
       actions: [
         IconButton(
           icon: const Icon(Icons.notifications_outlined, color: Colors.white),
-          onPressed: () => setState(() => _currentIndex = 2),
+          onPressed: () => Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const AppNotifications(role: NotificationRole.customer))),
         ),
-        CircleAvatar(
-          radius: 16,
-          backgroundColor: Colors.white24,
-          backgroundImage: _photoUrl != null ? NetworkImage(_photoUrl!) : null,
-          child: _photoUrl == null
-              ? Text(_initials, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))
-              : null,
+        GestureDetector(
+          onTap: () => Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const UserProfile(role: UserRole.customer)))
+            .then((_) => _loadInitials()),
+          child: CircleAvatar(
+            radius: 16,
+            backgroundColor: Colors.white24,
+            backgroundImage: _photoUrl != null ? NetworkImage(_photoUrl!) : null,
+            child: _photoUrl == null
+                ? Text(_initials, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))
+                : null,
+          ),
         ),
         const SizedBox(width: 12),
       ],
@@ -98,86 +111,10 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
   Widget _buildBody() {
     switch (_currentIndex) {
       case 0: return _buildVehicles();
-      case 1: return _buildSmartReports();
-      case 2: return _buildNotifications();
-      case 3:
-        _loadInitials(); // refresh initials when profile tab is opened
-        return const UserProfile(role: UserRole.customer);
-      case 4: return const CustomerPms();
+      case 1: return _buildSmartReports();   // center raised button
+      case 2: return const CustomerPms();
       default: return _buildVehicles();
     }
-  }
-
-  Widget _buildBottomNav() {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        boxShadow: [BoxShadow(color: Color(0x18000000), blurRadius: 12, offset: Offset(0, -2))],
-      ),
-      child: SafeArea(
-        child: SizedBox(
-          height: 64,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              // 4 regular tabs: 2 left + center placeholder + 2 right
-              Row(children: [
-                _navBtn(0), // My Vehicles
-                _navBtn(1), // Smart Reports
-                const Expanded(child: SizedBox()), // center placeholder
-                _navBtn(2), // Notifications
-                _navBtn(3), // Profile
-              ]),
-              // Center raised PMS button
-              Positioned(
-                top: -20,
-                left: 0, right: 0,
-                child: Center(
-                  child: GestureDetector(
-                    onTap: () => setState(() => _currentIndex = 4),
-                    child: Container(
-                      width: 56, height: 56,
-                      decoration: BoxDecoration(
-                        color: _currentIndex == 4 ? _red : const Color(0xFF1a202c),
-                        shape: BoxShape.circle,
-                        boxShadow: [BoxShadow(
-                          color: (_currentIndex == 4 ? _red : const Color(0xFF1a202c)).withOpacity(0.4),
-                          blurRadius: 12, offset: const Offset(0, 4))],
-                        border: Border.all(color: Colors.white, width: 3),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Icon(Icons.history, color: Colors.white, size: 20),
-                          Text('History', style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _navBtn(int i) {
-    final active = _currentIndex == i;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _currentIndex = i),
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(_navItems[i].icon, color: active ? _red : const Color(0xFF718096), size: 22),
-          const SizedBox(height: 2),
-          Text(_navItems[i].label,
-            style: TextStyle(fontSize: 10,
-              color: active ? _red : const Color(0xFF718096),
-              fontWeight: active ? FontWeight.w600 : FontWeight.normal)),
-        ]),
-      ),
-    );
   }
 
   // ── MY VEHICLES ──
@@ -202,6 +139,11 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
               : Future.value(null),
           builder: (context, userSnap) {
             final userName = (userSnap.data?.data() as Map<String, dynamic>?)?['name'] as String? ?? '';
+
+            // Auto-update statuses based on next PMS due date
+            if (userName.isNotEmpty && snapshot.hasData) {
+              _refreshVehicleStatuses(snapshot.data!.docs, userName);
+            }
 
             final vehicles = allDocs
                 .where((d) {
@@ -291,7 +233,7 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
         : status == 'Overdue' ? Colors.red
         : status == 'PMS Due Soon' ? Colors.amber.shade700
         : Colors.grey;
-    final statusLabel = status == 'Active' ? 'Good'
+    final statusLabel = status == 'Active' ? 'Active'
         : status == 'Under Maintenance' ? 'Under Maintenance'
         : status == 'Overdue' ? 'PMS Overdue'
         : status == 'PMS Due Soon' ? 'Due Soon'
@@ -371,6 +313,7 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
 
     // Compute next PMS
     String nextPms = '—';
+    int? daysUntil;
     final lastSvcDate = v['lastSvcDate'] ?? '';
     final svcFreq = v['svcFreq'] ?? '';
     if (lastSvcDate.isNotEmpty && svcFreq.isNotEmpty) {
@@ -379,7 +322,21 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
       if (date != null && months != null) {
         final next = DateTime(date.year, date.month + months, date.day);
         nextPms = '${next.year}-${next.month.toString().padLeft(2, '0')}-${next.day.toString().padLeft(2, '0')}';
+        daysUntil = next.difference(DateTime.now()).inDays;
       }
+    }
+
+    String statusLabel;
+    if (status == 'Under Maintenance') {
+      statusLabel = 'Under Maintenance';
+    } else if (daysUntil == null) {
+      statusLabel = status;
+    } else if (daysUntil < 0) {
+      statusLabel = 'Overdue (${daysUntil.abs()} day${daysUntil.abs() != 1 ? 's' : ''} ago)';
+    } else if (daysUntil == 0) {
+      statusLabel = 'Due Today';
+    } else {
+      statusLabel = '$status ($daysUntil day${daysUntil != 1 ? 's' : ''} remaining)';
     }
 
     showModalBottomSheet(
@@ -438,7 +395,7 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
                       _divider(),
                       _detailRow(Icons.event_outlined, 'Next PMS Due', nextPms, statusColor),
                       _divider(),
-                      _detailRow(Icons.info_outline, 'Status', status, statusColor),
+                      _detailRow(Icons.info_outline, 'Status', statusLabel, statusColor),
                     ]),
                   ),
                   const SizedBox(height: 16),
@@ -499,6 +456,36 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
   }
 
   Widget _divider() => const Divider(height: 1, indent: 62, endIndent: 12);
+
+  // ── STATUS COMPUTATION ──
+  String _computeStatus(String lastSvcDate, String svcFreq) {
+    if (lastSvcDate.isEmpty || svcFreq.isEmpty) return 'Active';
+    final date = DateTime.tryParse(lastSvcDate);
+    final months = int.tryParse(svcFreq);
+    if (date == null || months == null) return 'Active';
+    final nextPms = DateTime(date.year, date.month + months, date.day);
+    final daysUntil = nextPms.difference(DateTime.now()).inDays;
+    if (daysUntil < 0) return 'Overdue';
+    if (daysUntil <= 30) return 'PMS Due Soon';
+    return 'Active';
+  }
+
+  Future<void> _refreshVehicleStatuses(List<QueryDocumentSnapshot> docs, String userName) async {
+    for (final doc in docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final owner = data['owner'] as String? ?? '';
+      if (owner.toLowerCase() != userName.toLowerCase()) continue;
+      final currentStatus = data['status'] as String? ?? '';
+      if (currentStatus == 'Under Maintenance') continue; // don't override active maintenance
+      final computed = _computeStatus(
+        data['lastSvcDate'] as String? ?? '',
+        data['svcFreq'] as String? ?? '',
+      );
+      if (computed != currentStatus) {
+        await doc.reference.update({'status': computed});
+      }
+    }
+  }
 
   // ── SMART REPORTS ──
   final List<Map<String, String>> _chatMessages = [];
