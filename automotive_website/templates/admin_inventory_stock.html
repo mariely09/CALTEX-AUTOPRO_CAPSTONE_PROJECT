@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Inventory – AutoPro Admin</title>
+    <link rel="stylesheet" href="../static/css/style.css">
+    <link rel="stylesheet" href="../static/css/admin.css">
+</head>
+<body class="portal-body" data-page="inventory">
+
+<div class="admin-dashboard" style="display:flex;">
+    <div id="sidebarContainer"></div>
+
+    <div class="admin-main">
+        <div class="admin-header">
+            <div>
+                <div class="breadcrumb">Admin Portal › Inventory Management</div>
+                <div class="admin-header-title">Stock Inventory</div>
+            </div>
+            <div class="admin-header-actions">
+                <button class="btn-icon btn-success" onclick="openStaffReceiveDeliveryModal()"><span>📥</span> Receive Items</button>
+                <button class="btn-icon btn-primary" onclick="openAddInventoryModal()"><span>➕</span> Add New Item</button>
+            </div>
+        </div>
+
+        <div class="admin-content">
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.5rem;">
+                <div class="stat-card"><div class="stat-icon blue">📦</div><div class="stat-number" id="totalInventoryItems">0</div><div class="stat-label">Total Items</div></div>
+                <div class="stat-card"><div class="stat-icon red">⚠️</div><div class="stat-number" id="lowStockCount">0</div><div class="stat-label">Low Stock Items</div></div>
+                <div class="stat-card"><div class="stat-icon green">💰</div><div class="stat-number" id="totalInventoryValue">₱0</div><div class="stat-label">Total Value</div></div>
+            </div>
+
+            <div class="data-table">
+                <div class="table-header">
+                    <span>Parts Inventory</span>
+                    <div class="table-actions">
+                        <input type="text" class="search-bar" placeholder="Search parts..." id="inventorySearch" oninput="renderInventoryList()">
+                        <button class="btn-icon btn-secondary" onclick="openInventoryListScanModal()"><span>📷</span> Scan</button>
+                        <button class="btn-icon btn-success" onclick="openStaffReceiveDeliveryModal()"><span>📥</span> Receive Items</button>
+                        <button class="btn-icon btn-primary" onclick="openAddInventoryModal()"><span>➕</span> Add New Item</button>
+                    </div>
+                </div>
+                <div class="table-row" style="background:#f7fafc;font-weight:bold;border-bottom:2px solid #e2e8f0;grid-template-columns:100px 1.5fr 1fr 100px 90px 90px 90px 110px 110px;">
+                    <div>Item No.</div><div>Item Name</div><div>Commodity Group</div><div>Current Qty</div>
+                    <div>Min Level</div><div>Max Level</div><div>Reorder Qty</div><div>Status</div><div>Actions</div>
+                </div>
+                <div id="inventoryList"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="../static/js/data.js"></script>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+  if (!firebase.apps.length) {
+    firebase.initializeApp({
+      apiKey: "AIzaSyCaoJWbwJk0Xi694ARHpdHhiNjT0SpASRs",
+      authDomain: "caltex-autopro-1e664.firebaseapp.com",
+      projectId: "caltex-autopro-1e664",
+      storageBucket: "caltex-autopro-1e664.firebasestorage.app",
+      messagingSenderId: "930140433367",
+      appId: "1:930140433367:web:cf67bfa388fa517422b992"
+    });
+  }
+</script>
+<script src="../static/js/admin_firebase.js"></script>
+
+<script src="../static/js/admin_functions.js"></script>
+<script src="../static/js/admin.js"></script>
+<script>
+    fetch('admin_sidebar.html').then(r => r.text()).then(html => {
+        document.getElementById('sidebarContainer').innerHTML = html;
+    });
+</script>
+</body>
+</html>

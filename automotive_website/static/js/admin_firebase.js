@@ -1,0 +1,402 @@
+// admin_firebase.js — Connects admin dashboard to Firebase Firestore
+// Replaces local data.js arrays with live Firestore data
+
+(function () {
+  'use strict';
+
+  // ── Clear local data immediately so data.js hardcoded data doesn't show ──
+  window.assets             = [];
+  window.serviceTransactions = [];
+  window.inventory          = [];
+  window.itemMaster         = [];
+  window.issuances          = [];
+  window.users              = [];
+  window.domains            = [];
+
+  document.addEventListener('DOMContentLoaded', function () {
+    if (typeof firebase === 'undefined') return;
+
+    // Wait for Firebase Auth before querying Firestore
+    firebase.auth().onAuthStateChanged(function (user) {
+      if (!user) {
+        // Only redirect if no session stored — avoids redirect during auth restore
+        const stored = sessionStorage.getItem('apUser');
+        if (!stored) {
+          window.location.href = 'login.html';
+        }
+        return;
+      }
+      _initFirestore(user);
+    });
+  });
+
+  function _initFirestore(user) {
+    const db = firebase.firestore();
+
+    // ── Load user info from Firestore ──────────────────────
+    const apUser = JSON.parse(sessionStorage.getItem('apUser') || '{}');
+    if (user.uid) {
+      db.collection('users').doc(apUser.uid).get().then(doc => {
+        if (doc.exists) {
+          const name = doc.data().name || apUser.name || 'Administrator';
+          const nameEl = document.getElementById('adminName');
+          if (nameEl) nameEl.textContent = name;
+          const avatarEl = document.getElementById('adminAvatar');
+          if (avatarEl) {
+            const parts = name.trim().split(' ');
+            avatarEl.textContent = parts.length >= 2
+              ? (parts[0][0] + parts[1][0]).toUpperCase()
+              : parts[0][0].toUpperCase();
+          }
+        }
+      }).catch(() => {});
+    }
+
+    // ── Real-time listeners ────────────────────────────────
+
+    // Vehicles
+    db.collection('vehicles').onSnapshot(snap => {
+      window._fbVehicles = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+      // Map to admin_functions.js expected format
+      window.assets = window._fbVehicles.map(v => {
+        // Auto-calculate nextPMSDue from lastSvcDate + svcFreq months
+        const lastSvc = v.lastSvcDate || v.lastServiceDate || '';
+        const freq = parseInt(v.svcFreq || v.serviceFrequency) || 2;
+        let nextPMSDue = v.nextPMSDue || '';
+        if (lastSvc && !nextPMSDue) {
+          const d = new Date(lastSvc);
+          if (!isNaN(d)) {
+            d.setMonth(d.getMonth() + freq);
+            nextPMSDue = d.toISOString().split('T')[0];
+          }
+        }
+        // Auto-compute status from nextPMSDue if not explicitly set
+        let status = v.status || '';
+        if (status.toLowerCase() !== 'under maintenance' && status.toLowerCase() !== 'maintenance' && nextPMSDue) {
+          const due = new Date(nextPMSDue);
+          const today = new Date(); today.setHours(0,0,0,0);
+          const diff = Math.ceil((due - today) / 86400000);
+          if (diff < 0) status = 'Overdue';
+          else if (diff <= 30) status = 'PMS Due Soon';
+          else status = 'Active';
+        }
+        return {
+          id: v._id,
+          assetNum: v.assetNum || v._id,
+          plateNumber: v.plate || v.plateNumber || '',
+          assetDescription: v.desc || v.assetDescription || '',
+          type: v.type || 'truck',
+          icon: (v.type || '').toLowerCase().includes('car') ? '🚗' : '🚛',
+          owner: v.owner || v.ownerName || '',
+          odometer: v.odometer || v.odo || 0,
+          status: _mapVehicleStatus(status),
+          lastServiceDate: lastSvc,
+          nextPMSDue: nextPMSDue,
+          serviceFrequency: freq,
+        };
+      });
+      if (typeof renderAssetsList === 'function') renderAssetsList();
+      _updateOverviewStats();
+    });
+
+    // Maintenance / Services
+    db.collection('maintenance').orderBy('createdAt', 'desc').onSnapshot(snap => {
+      window._fbServices = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+      // Map to admin_functions.js expected format
+      window.serviceTransactions = window._fbServices.map(s => ({
+        serviceId: s._id,
+        assetNum: s.assetNum || s.plate || '',
+        plate: s.plate || '',
+        assetDescription: s.desc || s.assetDescription || s.plate || '',
+        mechanicName: s.mechanic || s.mechanicName || '',
+        dateServiced: s.date || s.dateServiced || '',
+        status: (s.status || 'pending').toLowerCase(),
+        totalCost: (() => {
+          // Use stored totalCost if available and > 0
+          const stored = parseFloat(s.totalCost || s.cost || 0);
+          if (stored > 0) return stored;
+          // Otherwise calculate from svcRows + matRows
+          const svcTotal = (s.svcRows || []).reduce((sum, r) => {
+            return sum + (parseFloat(r.cost || r.unitCost || 0) * (parseFloat(r.qty || r.quantity || 1)));
+          }, 0);
+          const matTotal = (s.matRows || []).reduce((sum, r) => {
+            return sum + (parseFloat(r.cost || r.unitCost || 0) * (parseFloat(r.qty || r.quantity || 1)));
+          }, 0);
+          return svcTotal + matTotal;
+        })(),
+        cost: (() => {
+          const stored = parseFloat(s.totalCost || s.cost || 0);
+          if (stored > 0) return '₱' + stored.toLocaleString('en-PH', {minimumFractionDigits:2});
+          const svcTotal = (s.svcRows || []).reduce((sum, r) => sum + (parseFloat(r.cost || 0) * (parseFloat(r.qty || 1))), 0);
+          const matTotal = (s.matRows || []).reduce((sum, r) => sum + (parseFloat(r.cost || 0) * (parseFloat(r.qty || 1))), 0);
+          const calc = svcTotal + matTotal;
+          return '₱' + calc.toLocaleString('en-PH', {minimumFractionDigits:2});
+        })(),
+        svcRows: s.svcRows || [],
+        matRows: s.matRows || [],
+        createdBy: s.createdBy || '',
+        createdAt: s.createdAt || null,
+      }));
+      if (typeof renderServicesList === 'function') {
+        const section = document.querySelector('.admin-section.active');
+        if (!section || section.id === 'asset-servicing') renderServicesList();
+      }
+      _updateServiceStats();
+      _updateOverviewStats();
+    });
+
+    // Stock Inventory
+    db.collection('stock_inventory').onSnapshot(snap => {
+      window._fbInventory = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+      window.inventory = window._fbInventory.map(i => ({
+        id: i._id,
+        itemNum: i.num || i._id,
+        itemName: i.name || '',
+        commodityGroup: i.group || '',
+        unit: i.uom || '',
+        price: parseFloat(i.price || i.cost || 0),
+        stock: parseInt(i.stock) || 0,
+        minLevel: parseInt(i.min) || 0,
+        maxLevel: parseInt(i.max) || 0,
+        reorderQty: parseInt(i.reorder) || 0,
+        status: i.status || 'OK',
+        barcode: i.barcode || '',
+        qrcode: i.qr || i.qrcode || '',
+      }));
+      if (typeof renderInventoryList === 'function') {
+        const section = document.querySelector('.admin-section.active');
+        if (!section || section.id === 'inventory') renderInventoryList();
+      }
+      _updateInventoryStats();
+      _updateOverviewStats();
+    });
+
+    // Item Master
+    db.collection('item_master').onSnapshot(snap => {
+      window._fbItemMaster = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+      window.itemMaster = window._fbItemMaster.map(i => ({
+        id: i._id,
+        itemNum: i.num || i._id,
+        itemName: i.name || '',
+        description: i.desc || i.description || '',
+        commodityGroup: i.group || '',
+        uom: i.uom || '',
+        cost: parseFloat(i.cost || 0),
+        itemType: i.type || 'Material',
+        barcode: i.barcode || '',
+        qrcode: i.qr || i.qrcode || '',
+        sku: i.sku || '',
+      }));
+      if (typeof renderItemMasterList === 'function') {
+        const section = document.querySelector('.admin-section.active');
+        if (!section || section.id === 'item-master') renderItemMasterList();
+      }
+    });
+
+    // Issuances
+    db.collection('issuances').orderBy('createdAt', 'desc').onSnapshot(snap => {
+      window._fbIssuances = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+      window.issuances = window._fbIssuances.map(i => ({
+        id: i._id,
+        issuanceId: i._id,
+        date: i.date || '',
+        assetNum: i.assetNum || i.plate || '',
+        plate: i.plate || '',
+        assetDescription: i.assetDesc || '',
+        itemNum: i.itemNum || '',
+        itemName: i.itemName || '',
+        itemType: i.itemType || 'Material',
+        commodityGroup: i.commodityGroup || '',
+        uom: i.uom || '',
+        quantity: parseFloat(i.qty) || 0,
+        unitCost: parseFloat(i.unitCost) || 0,
+        subtotal: parseFloat(i.subtotal) || 0,
+        createdBy: i.createdBy || '',
+      }));
+      if (typeof renderIssuancesList === 'function') {
+        const section = document.querySelector('.admin-section.active');
+        if (!section || section.id === 'issuance') renderIssuancesList();
+      }
+      _updateIssuanceStats();
+    });
+
+    // Transactions
+    db.collection('transactions').orderBy('createdAt', 'desc').onSnapshot(snap => {
+      window._fbTransactions = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+      if (typeof renderInventoryTransactions === 'function') {
+        const section = document.querySelector('.admin-section.active');
+        if (!section || section.id === 'inventory-transactions') renderInventoryTransactions();
+      }
+      _updateTransactionStats();
+    });
+
+    // Users
+    db.collection('users').onSnapshot(snap => {
+      window._fbUsers = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+      window.users = window._fbUsers.map((u, idx) => ({
+        id: u._id,
+        name: u.name || '',
+        username: u.username || u.email?.split('@')[0] || '',
+        email: u.email || '',
+        role: u.role || 'customer',
+        status: u.status || 'active',
+        createdAt: u.createdAt || '',
+        photoUrl: u.photoUrl || '',
+      }));
+      if (typeof renderUsersList === 'function') {
+        const section = document.querySelector('.admin-section.active');
+        if (!section || section.id === 'users') renderUsersList();
+      }
+      _updateUserStats();
+    });
+
+    // Domains
+    db.collection('domains').onSnapshot(snap => {
+      window._fbDomains = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+      window.domains = window._fbDomains.map(d => ({
+        id: d._id,
+        domainName: d.name || d.domainName || '',
+        domainList: Array.isArray(d.values) ? d.values : (d.domainList || []),
+      }));
+      if (typeof renderDomainsList === 'function') {
+        const section = document.querySelector('.admin-section.active');
+        if (!section || section.id === 'domains') renderDomainsList();
+      }
+    });
+
+    // Notifications
+    db.collection('notifications').orderBy('createdAt', 'desc').limit(20).onSnapshot(snap => {
+      window._fbNotifications = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+      if (typeof renderAdminNotifications === 'function') renderAdminNotifications();
+    });
+
+  } // end _initFirestore
+
+  // ── Stat updaters ──────────────────────────────────────────
+
+  function _updateOverviewStats() {
+    const vehicles = window._fbVehicles || [];
+    const services = window._fbServices || [];
+    const inventory = window._fbInventory || [];
+
+    // Total vehicles
+    const totalVehiclesEl = document.querySelector('#overview .stat-number');
+    // Use specific IDs if available
+    _setStat('statTotalVehicles', vehicles.length);
+
+    const now = new Date();
+    const dueForPms = vehicles.filter(v => {
+      const status = (v.status || '').toLowerCase();
+      return status === 'overdue' || status === 'pms due soon';
+    }).length;
+    _setStat('statDueForPms', dueForPms);
+
+    const lowStock = (window._fbInventory || []).filter(i =>
+      (i.status || '').toLowerCase() === 'low'
+    ).length;
+    _setStat('statLowStock', lowStock);
+
+    const oneWeekAgo = new Date(now - 7 * 86400000);
+    const servicesThisWeek = services.filter(s => {
+      if (!s.createdAt) return false;
+      const d = s.createdAt.toDate ? s.createdAt.toDate() : new Date(s.createdAt);
+      return d >= oneWeekAgo;
+    }).length;
+    _setStat('statServicesWeek', servicesThisWeek);
+
+    // Update the overview stat cards directly
+    const statCards = document.querySelectorAll('#overview .stat-number');
+    if (statCards[0]) statCards[0].textContent = vehicles.length;
+    if (statCards[1]) statCards[1].textContent = dueForPms;
+    if (statCards[2]) statCards[2].textContent = lowStock;
+    if (statCards[3]) statCards[3].textContent = servicesThisWeek;
+
+    // Recent services table
+    _renderRecentServices(services.slice(0, 5));
+  }
+
+  function _renderRecentServices(services) {
+    const container = document.querySelector('#overview .data-table');
+    if (!container) return;
+    const rows = container.querySelectorAll('.table-row:not(:first-child)');
+    rows.forEach(r => r.remove());
+
+    if (!services.length) return;
+    services.forEach(s => {
+      const row = document.createElement('div');
+      row.className = 'table-row';
+      const statusClass = (s.status || '').toLowerCase() === 'completed' ? 'status-completed'
+        : (s.status || '').toLowerCase() === 'ongoing' ? 'status-pending' : 'status-pending';
+      row.innerHTML = `
+        <div><strong>${s.plate || '—'}</strong></div>
+        <div>${_getFirstService(s)}</div>
+        <div>${s.date || '—'}</div>
+        <div><span class="status-badge ${statusClass}">${s.status || '—'}</span></div>`;
+      container.appendChild(row);
+    });
+  }
+
+  function _getFirstService(s) {
+    const rows = s.svcRows || [];
+    return rows.length ? (rows[0].name || '—') : (s.desc || '—');
+  }
+
+  function _updateServiceStats() {
+    const services = window._fbServices || [];
+    _setStat('totalServices', services.length);
+    _setStat('ongoingServices',   services.filter(s => (s.status||'').toLowerCase() === 'ongoing').length);
+    _setStat('completedServices', services.filter(s => (s.status||'').toLowerCase() === 'completed').length);
+    _setStat('pendingServices',   services.filter(s => (s.status||'').toLowerCase() === 'pending').length);
+  }
+
+  function _updateInventoryStats() {
+    const inv = window._fbInventory || [];
+    _setStat('totalInventoryItems', inv.length);
+    const low = inv.filter(i => (i.status || '').toLowerCase() === 'low');
+    _setStat('lowStockCount', low.length);
+    const total = inv.reduce((s, i) => {
+      const qty = parseFloat(i.stock) || 0;
+      const price = parseFloat(i.price || i.cost || 0);
+      return s + qty * price;
+    }, 0);
+    _setStat('totalInventoryValue', '₱' + total.toLocaleString('en-PH', { minimumFractionDigits: 0 }));
+  }
+
+  function _updateIssuanceStats() {
+    const iss = window._fbIssuances || [];
+    _setStat('totalIssuances', iss.length);
+    _setStat('totalIssuanceServices', iss.filter(i => i.itemType === 'Service').length);
+    _setStat('totalMaterials', iss.filter(i => i.itemType === 'Material').length);
+  }
+
+  function _updateTransactionStats() {
+    const txns = window._fbTransactions || [];
+    _setStat('txnTotal', txns.length);
+    _setStat('txnIn', txns.filter(t => t.type === 'IN').length);
+    _setStat('txnOut', txns.filter(t => t.type === 'OUT').length);
+    const items = new Set(txns.map(t => t.item)).size;
+    _setStat('txnItems', items);
+  }
+
+  function _updateUserStats() {
+    const users = window._fbUsers || [];
+    _setStat('userStatTotal', users.length);
+    _setStat('userStatActive', users.filter(u => (u.status || '').toLowerCase() === 'active').length);
+    _setStat('userStatInactive', users.filter(u => (u.status || '').toLowerCase() !== 'active').length);
+  }
+
+  function _setStat(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  }
+
+  function _mapVehicleStatus(status) {
+    const s = (status || '').toLowerCase();
+    if (s === 'under maintenance' || s === 'maintenance') return 'maintenance';
+    if (s === 'overdue' || s === 'pms overdue') return 'overdue';
+    if (s === 'pms due soon' || s === 'due soon') return 'due-soon';
+    if (s === 'inactive') return 'inactive';
+    return 'active';
+  }
+
+})(); // end IIFE

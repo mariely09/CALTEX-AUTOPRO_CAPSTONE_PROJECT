@@ -113,6 +113,7 @@ function escapeHtml(str) {
 function renderAssetsList() {
     var assetsList = document.getElementById('assetsList');
     if (!assetsList) return;
+    // Use Firebase data if available, fallback to local data.js
     var assets = window.assets || [];
 
     if (assets.length === 0) {
@@ -145,8 +146,7 @@ function renderAssetsList() {
     }
 
     assetsList.innerHTML = assets.map(function(asset) {
-        return '<div class="table-row" style="grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 120px;">'
-            + '<div><strong>' + asset.assetNum + '</strong></div>'
+        return '<div class="table-row" style="grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr 1fr 120px;">'
             + '<div>' + asset.plateNumber + '</div>'
             + '<div>' + (asset.icon||'') + ' ' + (asset.type||'-') + '</div>'
             + '<div>' + (asset.owner||'-') + '</div>'

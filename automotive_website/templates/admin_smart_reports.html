@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Reports – AutoPro Admin</title>
+    <link rel="stylesheet" href="../static/css/style.css">
+    <link rel="stylesheet" href="../static/css/admin.css">
+</head>
+<body class="portal-body" data-page="smart-reports">
+
+<div class="admin-dashboard" style="display:flex;">
+    <div id="sidebarContainer"></div>
+
+    <div class="admin-main">
+        <div class="admin-header">
+            <div>
+                <div class="breadcrumb">Admin Portal</div>
+                <div class="admin-header-title">Smart Reports</div>
+            </div>
+            <div class="admin-header-actions">
+                <button class="btn-icon btn-secondary" onclick="clearSmartChat()"><span>🗑️</span> Clear Chat</button>
+            </div>
+        </div>
+
+        <div class="admin-content">
+            <div class="sr-chat-container">
+                <div class="sr-chat-topbar">
+                    <div style="display:flex;align-items:center;gap:0.6rem;">
+                        <div class="sr-topbar-avatar">🤖</div>
+                        <div>
+                            <div style="font-size:0.88rem;font-weight:700;color:#1a202c;">Smart Reports AI</div>
+                            <div style="font-size:0.75rem;color:#38a169;display:flex;align-items:center;gap:0.3rem;">
+                                <span style="width:6px;height:6px;background:#38a169;border-radius:50%;display:inline-block;"></span> Online
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="clearSmartChat()" class="sr-clear-btn" title="Clear conversation">🗑️ Clear</button>
+                </div>
+
+                <div class="sr-chat-messages" id="srChatMessages">
+                    <div class="sr-welcome-bubble">
+                        <div class="sr-avatar-ai">🤖</div>
+                        <div class="sr-bubble-ai">
+                            <div style="font-weight:700;margin-bottom:0.4rem;font-size:0.95rem;">Hello! I'm your Smart Reports assistant. 👋</div>
+                            <div style="color:#4a5568;font-size:0.88rem;line-height:1.6;margin-bottom:1rem;">Ask me anything about your fleet — assets, inventory, maintenance costs, and more.</div>
+                            <div class="sr-welcome-chips">
+                                <button class="sr-suggest-chip" onclick="setAndRunQuery('Which assets are frequently under maintenance?')">🔧 Frequently maintained assets</button>
+                                <button class="sr-suggest-chip" onclick="setAndRunQuery('What items are low in stock?')">📦 Low stock items</button>
+                                <button class="sr-suggest-chip" onclick="setAndRunQuery('Total repair cost this month')">💰 Repair cost this month</button>
+                                <button class="sr-suggest-chip" onclick="setAndRunQuery('Assets with PMS overdue')">⚠️ PMS overdue assets</button>
+                                <button class="sr-suggest-chip" onclick="setAndRunQuery('Which assets are under maintenance?')">🔵 Under maintenance</button>
+                                <button class="sr-suggest-chip" onclick="setAndRunQuery('What are the fast moving inventory items?')">📈 Fast moving inventory</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sr-chat-input-bar">
+                    <textarea id="smartQueryInput" class="sr-chat-input" placeholder="Ask something about your fleet data..." rows="1"
+                        onkeydown="if(event.key==='Enter' && !event.shiftKey){ event.preventDefault(); runSmartQuery(); }"
+                        oninput="this.style.height='auto'; this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+                    <button class="sr-send-btn" onclick="runSmartQuery()" title="Send">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                        </svg>
+                    </button>
+                </div>
+                <div class="sr-chat-hint">Press Enter to send &nbsp;·&nbsp; Shift+Enter for new line</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="../static/js/data.js"></script>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+  if (!firebase.apps.length) {
+    firebase.initializeApp({
+      apiKey: "AIzaSyCaoJWbwJk0Xi694ARHpdHhiNjT0SpASRs",
+      authDomain: "caltex-autopro-1e664.firebaseapp.com",
+      projectId: "caltex-autopro-1e664",
+      storageBucket: "caltex-autopro-1e664.firebasestorage.app",
+      messagingSenderId: "930140433367",
+      appId: "1:930140433367:web:cf67bfa388fa517422b992"
+    });
+  }
+</script>
+<script src="../static/js/admin_firebase.js"></script>
+
+<script src="../static/js/admin_functions.js"></script>
+<script src="../static/js/admin.js"></script>
+<script>
+    fetch('admin_sidebar.html').then(r => r.text()).then(html => {
+        document.getElementById('sidebarContainer').innerHTML = html;
+    });
+</script>
+</body>
+</html>

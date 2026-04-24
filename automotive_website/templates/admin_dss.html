@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DSS – Stock Replenishment – AutoPro Admin</title>
+    <link rel="stylesheet" href="../static/css/style.css">
+    <link rel="stylesheet" href="../static/css/admin.css">
+</head>
+<body class="portal-body" data-page="dss">
+
+<div class="admin-dashboard" style="display:flex;">
+    <div id="sidebarContainer"></div>
+
+    <div class="admin-main">
+        <div class="admin-header">
+            <div>
+                <div class="breadcrumb">Admin Portal › Decision Support System</div>
+                <div class="admin-header-title">Stock Replenishment</div>
+            </div>
+            <div class="admin-header-actions">
+                <button class="btn-icon btn-secondary" onclick="renderDSS()"><span>🔄</span> Refresh</button>
+            </div>
+        </div>
+
+        <div class="admin-content">
+            <!-- Hero -->
+            <div class="dss-hero">
+                <div class="dss-hero-left">
+                    <div class="dss-hero-icon">🧠</div>
+                    <div>
+                        <div class="dss-hero-title">Decision Support System</div>
+                        <div class="dss-hero-sub">Stock Replenishment Intelligence</div>
+                    </div>
+                </div>
+                <button class="dss-refresh-btn" onclick="renderDSS()">🔄 Refresh Analysis</button>
+            </div>
+
+            <!-- KPIs -->
+            <div class="dss-kpi-grid" id="dssKpiGrid"></div>
+
+            <!-- Filter bar -->
+            <div class="dss-filter-bar">
+                <div class="dss-filter-group">
+                    <label class="dss-filter-label">Filter by Priority</label>
+                    <div class="dss-filter-pills" id="dssFilterPills">
+                        <button class="dss-pill active" onclick="dssSetFilter('all', this)">All</button>
+                        <button class="dss-pill critical" onclick="dssSetFilter('critical', this)">🚨 Critical</button>
+                        <button class="dss-pill warning" onclick="dssSetFilter('warning', this)">⚠️ Warning</button>
+                        <button class="dss-pill ok" onclick="dssSetFilter('ok', this)">✅ Adequate</button>
+                    </div>
+                </div>
+                <input type="text" class="dss-search" id="dssSearch" placeholder="🔍 Search item..." oninput="dssApplySearch()">
+            </div>
+
+            <!-- Table -->
+            <div class="dss-table-wrap">
+                <div class="dss-table-header">
+                    <span>📋 Replenishment Recommendations</span>
+                    <button class="dss-export-btn" onclick="dssPrintReport()">🖨️ Print Report</button>
+                </div>
+                <div style="overflow-x:auto;">
+                    <table class="dss-table">
+                        <thead>
+                            <tr>
+                                <th>Item</th><th>Stock Status</th><th>Consumption Rate</th>
+                                <th>Days of Stock Left</th><th>Recommended Order</th><th>Priority</th><th>Decision</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dssTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="../static/js/data.js"></script>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+  if (!firebase.apps.length) {
+    firebase.initializeApp({
+      apiKey: "AIzaSyCaoJWbwJk0Xi694ARHpdHhiNjT0SpASRs",
+      authDomain: "caltex-autopro-1e664.firebaseapp.com",
+      projectId: "caltex-autopro-1e664",
+      storageBucket: "caltex-autopro-1e664.firebasestorage.app",
+      messagingSenderId: "930140433367",
+      appId: "1:930140433367:web:cf67bfa388fa517422b992"
+    });
+  }
+</script>
+<script src="../static/js/admin_firebase.js"></script>
+
+<script src="../static/js/admin_functions.js"></script>
+<script src="../static/js/admin.js"></script>
+<script>
+    fetch('admin_sidebar.html').then(r => r.text()).then(html => {
+        document.getElementById('sidebarContainer').innerHTML = html;
+        if (typeof renderDSS === 'function') renderDSS();
+    });
+</script>
+</body>
+</html>

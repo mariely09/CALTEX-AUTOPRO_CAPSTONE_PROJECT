@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Management – AutoPro Admin</title>
+    <link rel="stylesheet" href="../static/css/style.css">
+    <link rel="stylesheet" href="../static/css/admin.css">
+</head>
+<body class="portal-body" data-page="users">
+
+<div class="admin-dashboard" style="display:flex;">
+    <div id="sidebarContainer"></div>
+
+    <div class="admin-main">
+        <div class="admin-header">
+            <div>
+                <div class="breadcrumb">Admin Portal</div>
+                <div class="admin-header-title">User Management</div>
+            </div>
+            <div class="admin-header-actions">
+                <button class="btn-icon btn-primary" onclick="openAddUserModal()"><span>➕</span> Add User</button>
+            </div>
+        </div>
+
+        <div class="admin-content">
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1.25rem;margin-bottom:2rem;">
+                <div class="stat-card">
+                    <div class="stat-icon blue">👥</div>
+                    <div class="stat-number" id="userStatTotal">0</div>
+                    <div class="stat-label">Total Users</div>
+                    <div class="stat-change positive">All registered accounts</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon green">✅</div>
+                    <div class="stat-number" id="userStatActive">0</div>
+                    <div class="stat-label">Active Users</div>
+                    <div class="stat-change positive">Currently enabled</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon red">🚫</div>
+                    <div class="stat-number" id="userStatInactive">0</div>
+                    <div class="stat-label">Inactive Users</div>
+                    <div class="stat-change negative">Disabled accounts</div>
+                </div>
+            </div>
+
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;gap:1rem;flex-wrap:wrap;">
+                <input type="text" class="search-bar" placeholder="Search users..." id="userSearch" oninput="renderUsersList()" style="width:280px;">
+                <button class="btn-icon btn-primary" onclick="openAddUserModal()"><span>➕</span> Add User</button>
+            </div>
+
+            <div class="data-table">
+                <div class="table-row" style="background:#f7fafc;font-weight:bold;border-bottom:2px solid #e2e8f0;grid-template-columns:40px 1.5fr 1fr 1.5fr 1fr 1fr 140px;">
+                    <div>#</div><div>Full Name</div><div>Username</div><div>Email</div><div>Role</div><div>Status</div><div>Actions</div>
+                </div>
+                <div id="userCardsList"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="../static/js/data.js"></script>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+  if (!firebase.apps.length) {
+    firebase.initializeApp({
+      apiKey: "AIzaSyCaoJWbwJk0Xi694ARHpdHhiNjT0SpASRs",
+      authDomain: "caltex-autopro-1e664.firebaseapp.com",
+      projectId: "caltex-autopro-1e664",
+      storageBucket: "caltex-autopro-1e664.firebasestorage.app",
+      messagingSenderId: "930140433367",
+      appId: "1:930140433367:web:cf67bfa388fa517422b992"
+    });
+  }
+</script>
+<script src="../static/js/admin_firebase.js"></script>
+
+<script src="../static/js/admin_functions.js"></script>
+<script src="../static/js/admin.js"></script>
+<script>
+    fetch('admin_sidebar.html').then(r => r.text()).then(html => {
+        document.getElementById('sidebarContainer').innerHTML = html;
+    });
+</script>
+</body>
+</html>

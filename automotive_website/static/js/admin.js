@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // Check session
     const user = sessionStorage.getItem('apUser');
     if (!user) {
-        window.location.href = 'index.html';
+        window.location.href = 'login.html';
         return;
     }
 
@@ -31,7 +31,13 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('adminLogoutBtn')?.addEventListener('click', () => {
         if (confirm('Are you sure you want to logout?')) {
             sessionStorage.removeItem('apUser');
-            window.location.href = 'index.html';
+            if (typeof firebase !== 'undefined' && firebase.auth) {
+                firebase.auth().signOut().finally(() => {
+                    window.location.href = 'login.html';
+                });
+            } else {
+                window.location.href = 'login.html';
+            }
         }
     });
 

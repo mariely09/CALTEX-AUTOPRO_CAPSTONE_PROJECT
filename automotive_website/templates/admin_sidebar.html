@@ -1,0 +1,204 @@
+<!-- Admin Sidebar Component -->
+<div class="admin-sidebar">
+    <div class="admin-sidebar-header">
+        <div class="sidebar-topbar">
+            <img src="../static/img/LOGO_CALTEX.png" alt="Logo" class="sidebar-logo-img">
+            <div class="sidebar-brand">
+                <img src="../static/img/CALTEX_LETTER.png" alt="Caltex" class="sidebar-wordmark">
+                <span class="sidebar-autopro">AutoPro</span>
+            </div>
+        </div>
+        <div class="admin-subtitle">Admin Control Panel</div>
+    </div>
+
+    <div class="admin-nav">
+        <a href="admin_dashboard.html" class="admin-nav-btn" data-page="dashboard">
+            <span class="admin-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+            </span>
+            Dashboard
+        </a>
+        
+        <button class="admin-nav-btn" onclick="toggleSubmenu('inventorySubmenu', this)">
+            <span class="admin-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+            </span>
+            Inventory Management
+            <svg class="submenu-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="admin-submenu" id="inventorySubmenu">
+            <a href="admin_inventory_itemaster.html" class="admin-nav-btn submenu-item" data-page="item-master">
+                <span class="admin-nav-icon">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                </span>
+                Item Master
+            </a>
+            <a href="admin_inventory_stock.html" class="admin-nav-btn submenu-item" data-page="inventory">
+                <span class="admin-nav-icon">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                </span>
+                Stock Inventory
+            </a>
+            <a href="admin_dashboard.html#inventory-transactions" class="admin-nav-btn submenu-item" data-page="inventory-transactions">
+                <span class="admin-nav-icon">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+                </span>
+                Inventory Transactions
+            </a>
+        </div>
+        
+        <button class="admin-nav-btn" onclick="toggleSubmenu('assetSubmenu', this)">
+            <span class="admin-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+            </span>
+            Vehicle Maintenance
+            <svg class="submenu-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="admin-submenu" id="assetSubmenu">
+            <a href="admin_vehicle_list.html" class="admin-nav-btn submenu-item" data-page="assets">
+                <span class="admin-nav-icon">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                </span>
+                Vehicle List
+            </a>
+            <a href="admin_vehicle_maintenance.html" class="admin-nav-btn submenu-item" data-page="asset-servicing">
+                <span class="admin-nav-icon">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                </span>
+                Vehicle Maintenance
+            </a>
+            <a href="admin_dashboard.html#issuance" class="admin-nav-btn submenu-item" data-page="issuance">
+                <span class="admin-nav-icon">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                </span>
+                Issuances
+            </a>
+        </div>
+        
+        <button class="admin-nav-btn" onclick="toggleSubmenu('dssSubmenu', this)">
+            <span class="admin-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/><path d="M18 2l4 4-4 4"/><path d="M22 2l-4 4"/></svg>
+            </span>
+            Decision Support System
+            <svg class="submenu-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="admin-submenu" id="dssSubmenu">
+            <a href="admin_dss.html" class="admin-nav-btn submenu-item" data-page="dss">
+                <span class="admin-nav-icon">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                </span>
+                Stock Replenishment
+            </a>
+            <a href="admin_dashboard.html#dss-pms" class="admin-nav-btn submenu-item" data-page="dss-pms">
+                <span class="admin-nav-icon">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                </span>
+                Preventive Maintenance
+            </a>
+        </div>
+        
+        <a href="admin_users.html" class="admin-nav-btn" data-page="users">
+            <span class="admin-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </span>
+            User Management
+        </a>
+        
+        <a href="admin_smart_reports.html" class="admin-nav-btn" data-page="smart-reports">
+            <span class="admin-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/></svg>
+            </span>
+            Smart Reports
+        </a>
+
+        <a href="admin_domain_management.html" class="admin-nav-btn" data-page="domains">
+            <span class="admin-nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v18H3z"/><path d="M3 9h18M9 3v18"/></svg>
+            </span>
+            Domain Management
+        </a>
+    </div>
+
+    <div class="admin-sidebar-footer">
+        <div class="admin-user-info">
+            <div class="admin-user-avatar" id="adminAvatar">AD</div>
+            <div>
+                <div style="font-weight:700;font-size:0.9rem;color:#1a202c;" id="adminName">Administrator</div>
+                <div style="font-size:0.75rem;color:#718096;">Super Admin</div>
+            </div>
+        </div>
+        <button class="logout-btn" onclick="handleLogout()">
+            <span>🚪</span> Logout
+        </button>
+    </div>
+</div>
+
+<script>
+// Sidebar navigation functions
+function toggleSubmenu(submenuId, button) {
+    const submenu = document.getElementById(submenuId);
+    const arrow = button.querySelector('.submenu-arrow');
+    if (submenu.style.display === 'none' || !submenu.style.display) {
+        submenu.style.display = 'block';
+        if (arrow) arrow.style.transform = 'rotate(180deg)';
+    } else {
+        submenu.style.display = 'none';
+        if (arrow) arrow.style.transform = 'rotate(0deg)';
+    }
+}
+
+// Set active nav item — runs immediately after sidebar is injected
+(function initSidebarActive() {
+    const currentPage = document.body.getAttribute('data-page');
+    if (!currentPage) return;
+
+    document.querySelectorAll('.admin-nav-btn').forEach(btn => btn.classList.remove('active'));
+
+    const activeBtn = document.querySelector(`.admin-nav-btn[data-page="${currentPage}"]`);
+    if (activeBtn) {
+        activeBtn.classList.add('active');
+        if (activeBtn.classList.contains('submenu-item')) {
+            const submenu = activeBtn.closest('.admin-submenu');
+            if (submenu) {
+                submenu.style.display = 'block';
+                const parentBtn = submenu.previousElementSibling;
+                const arrow = parentBtn?.querySelector('.submenu-arrow');
+                if (arrow) arrow.style.transform = 'rotate(180deg)';
+            }
+        }
+    }
+})();
+
+// Logout handler — uses Firebase Auth if available
+function handleLogout() {
+    if (!confirm('Are you sure you want to logout?')) return;
+    sessionStorage.removeItem('apUser');
+    if (typeof firebase !== 'undefined' && firebase.auth) {
+        firebase.auth().signOut().then(() => {
+            window.location.href = 'login.html';
+        }).catch(() => {
+            window.location.href = 'login.html';
+        });
+    } else {
+        window.location.href = 'login.html';
+    }
+}
+</script>
+
+<style>
+.submenu-arrow {
+    margin-left: auto;
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+}
+
+.admin-submenu {
+    display: none;
+    overflow: hidden;
+}
+
+.admin-nav-btn {
+    text-decoration: none;
+    display: flex;
+}
+</style>

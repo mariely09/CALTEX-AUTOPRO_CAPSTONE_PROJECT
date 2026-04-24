@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoPro – Customer Portal</title>
+    <link rel="stylesheet" href="../static/css/customer_dashboard.css">
+</head>
+<body data-page="dashboard">
+
+<!-- Header (loaded dynamically) -->
+<div id="customerHeader"></div>
+
+<!-- Main -->
+<main class="cu-main">
+    <div class="cu-stats-grid">
+        <div class="cu-stat-card">
+            <div class="cu-stat-icon red">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+            </div>
+            <div class="cu-stat-value" id="cuTotalVehicles">0</div>
+            <div class="cu-stat-label">Total Vehicles</div>
+        </div>
+        <div class="cu-stat-card">
+            <div class="cu-stat-icon orange">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+            </div>
+            <div class="cu-stat-value" id="cuMaintenance">0</div>
+            <div class="cu-stat-label">Maintenance</div>
+        </div>
+        <div class="cu-stat-card">
+            <div class="cu-stat-icon red">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+            <div class="cu-stat-value" id="cuOverdue">0</div>
+            <div class="cu-stat-label">PMS Overdue</div>
+        </div>
+        <div class="cu-stat-card">
+            <div class="cu-stat-icon amber">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div class="cu-stat-value" id="cuDueSoon">0</div>
+            <div class="cu-stat-label">Due Soon</div>
+        </div>
+    </div>
+
+    <div class="cu-section-title">My Fleet</div>
+    <div id="cuVehiclesList"></div>
+</main>
+
+<!-- Vehicle Details Modal -->
+<div class="cu-modal" id="cuVehicleModal">
+    <div class="cu-modal-content">
+        <div class="cu-modal-header">
+            <div class="cu-modal-handle"></div>
+            <div class="cu-modal-header-row">
+                <div class="cu-modal-icon" id="cuModalIcon">🚗</div>
+                <div style="flex:1;">
+                    <div class="cu-modal-title" id="cuModalPlate">—</div>
+                    <div class="cu-modal-sub" id="cuModalDesc">—</div>
+                </div>
+                <button class="cu-modal-close" onclick="cuCloseModal()">&times;</button>
+            </div>
+        </div>
+        <div class="cu-modal-body">
+            <div class="cu-detail-card" id="cuModalDetails"></div>
+            <button class="cu-btn cu-btn-outline" onclick="cuCloseModal()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                Close
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast -->
+<div id="cuToast"></div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+  firebase.initializeApp({
+    apiKey: "AIzaSyCaoJWbwJk0Xi694ARHpdHhiNjT0SpASRs",
+    authDomain: "caltex-autopro-1e664.firebaseapp.com",
+    projectId: "caltex-autopro-1e664",
+    storageBucket: "caltex-autopro-1e664.firebasestorage.app",
+    messagingSenderId: "930140433367",
+    appId: "1:930140433367:web:cf67bfa388fa517422b992"
+  });
+</script>
+<script src="../static/js/customer_dashboard.js"></script>
+<script>
+  fetch('customer_header.html').then(r => r.text()).then(html => {
+    document.getElementById('customerHeader').innerHTML = html;
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoPro – Staff Portal</title>
+    <link rel="stylesheet" href="../static/css/staff_dashboard.css">
+</head>
+<body>
+
+<!-- Top Bar -->
+<header class="sf-topbar">
+    <div class="sf-topbar-brand">
+        <img src="../static/img/LOGO_CALTEX.png" alt="Logo" class="sf-topbar-logo">
+        <div class="sf-topbar-text">
+            <img src="../static/img/CALTEX_LETTER.png" alt="Caltex" class="sf-topbar-wordmark">
+            <span class="sf-topbar-autopro">AutoPro</span>
+        </div>
+    </div>
+    <div class="sf-topbar-actions">
+        <button class="sf-notif-btn" onclick="sfShowNotifications()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <span class="sf-notif-badge" id="sfNotifBadge" style="display:none;">0</span>
+        </button>
+        <div class="sf-avatar" id="sfAvatar" onclick="sfShowProfile()">ST</div>
+    </div>
+</header>
+
+<!-- Layout -->
+<div class="sf-layout">
+    <!-- Sidebar -->
+    <aside class="sf-sidebar">
+        <nav class="sf-nav">
+            <button class="sf-nav-btn active" onclick="sfSwitchSection('dashboard', this)">
+                <span class="sf-nav-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                </span>
+                Dashboard
+            </button>
+            <button class="sf-nav-btn" onclick="sfSwitchSection('inventory', this)">
+                <span class="sf-nav-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                </span>
+                Inventory
+            </button>
+            <button class="sf-nav-btn" onclick="sfSwitchSection('maintenance', this)">
+                <span class="sf-nav-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                </span>
+                Maintenance
+            </button>
+            <button class="sf-nav-btn" onclick="sfSwitchSection('vehicles', this)">
+                <span class="sf-nav-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                </span>
+                Vehicles
+            </button>
+        </nav>
+        <div class="sf-sidebar-footer">
+            <div class="sf-user-info">
+                <div class="sf-user-avatar" id="sfUserAvatar">ST</div>
+                <div>
+                    <div class="sf-user-name" id="sfUserName">Staff Member</div>
+                    <div class="sf-user-role">Service Staff</div>
+                </div>
+            </div>
+            <button class="sf-logout-btn" onclick="sfLogout()">
+                <span>🚪</span> Logout
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="sf-main">
+        <!-- Dashboard Section -->
+        <section class="sf-section active" id="sfDashboard">
+            <div class="sf-page-header">
+                <div>
+                    <div class="sf-breadcrumb">Staff Portal</div>
+                    <div class="sf-page-title">Dashboard</div>
+                </div>
+            </div>
+            <div class="sf-content">
+                <div class="sf-stats-grid">
+                    <div class="sf-stat-card">
+                        <div class="sf-stat-icon red">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                        </div>
+                        <div class="sf-stat-value" id="sfTotalServices">0</div>
+                        <div class="sf-stat-label">Total Services</div>
+                    </div>
+                    <div class="sf-stat-card">
+                        <div class="sf-stat-icon orange">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                        </div>
+                        <div class="sf-stat-value" id="sfOngoing">0</div>
+                        <div class="sf-stat-label">Ongoing</div>
+                    </div>
+                    <div class="sf-stat-card">
+                        <div class="sf-stat-icon teal">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                        </div>
+                        <div class="sf-stat-value" id="sfCompleted">0</div>
+                        <div class="sf-stat-label">Completed</div>
+                    </div>
+                    <div class="sf-stat-card">
+                        <div class="sf-stat-icon blue">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                        </div>
+                        <div class="sf-stat-value" id="sfLowStock">0</div>
+                        <div class="sf-stat-label">Low Stock</div>
+                    </div>
+                </div>
+
+                <div class="sf-card">
+                    <div class="sf-card-header">
+                        <span class="sf-card-title">Today's Service Schedule</span>
+                        <button class="sf-btn sf-btn-secondary" onclick="sfSwitchSection('maintenance', document.querySelector('[onclick*=maintenance]'))">See all</button>
+                    </div>
+                    <div id="sfTodaySchedule"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Inventory Section -->
+        <section class="sf-section" id="sfInventory">
+            <div class="sf-page-header">
+                <div>
+                    <div class="sf-breadcrumb">Staff Portal</div>
+                    <div class="sf-page-title">Inventory</div>
+                </div>
+                <div class="sf-page-actions">
+                    <button class="sf-btn sf-btn-blue" onclick="sfOpenReceiveModal()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg>
+                        Receive Items
+                    </button>
+                </div>
+            </div>
+            <div class="sf-content">
+                <div class="sf-card">
+                    <div class="sf-card-header">
+                        <span class="sf-card-title">Parts Inventory</span>
+                        <div class="sf-search-wrap">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                            <input type="text" class="sf-search-bar" placeholder="Search parts..." id="sfInvSearch" oninput="sfRenderInventory()">
+                        </div>
+                    </div>
+                    <div id="sfInventoryList"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Maintenance Section -->
+        <section class="sf-section" id="sfMaintenance">
+            <div class="sf-page-header">
+                <div>
+                    <div class="sf-breadcrumb">Staff Portal</div>
+                    <div class="sf-page-title">Maintenance</div>
+                </div>
+                <div class="sf-page-actions">
+                    <button class="sf-btn sf-btn-primary" onclick="sfOpenNewServiceModal()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        New Service
+                    </button>
+                </div>
+            </div>
+            <div class="sf-content">
+                <div class="sf-card">
+                    <div class="sf-card-header">
+                        <span class="sf-card-title">Service Transactions</span>
+                        <div class="sf-search-wrap">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                            <input type="text" class="sf-search-bar" placeholder="Search services..." id="sfSvcSearch" oninput="sfRenderServices()">
+                        </div>
+                    </div>
+                    <div id="sfServicesList"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Vehicles Section -->
+        <section class="sf-section" id="sfVehicles">
+            <div class="sf-page-header">
+                <div>
+                    <div class="sf-breadcrumb">Staff Portal</div>
+                    <div class="sf-page-title">Vehicles</div>
+                </div>
+                <div class="sf-page-actions">
+                    <button class="sf-btn sf-btn-primary" onclick="sfOpenAddVehicleModal()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        Add Vehicle
+                    </button>
+                </div>
+            </div>
+            <div class="sf-content">
+                <div class="sf-card">
+                    <div class="sf-card-header">
+                        <span class="sf-card-title">All Vehicles</span>
+                        <div class="sf-search-wrap">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                            <input type="text" class="sf-search-bar" placeholder="Search vehicles..." id="sfVehicleSearch" oninput="sfRenderVehicles()">
+                        </div>
+                    </div>
+                    <div id="sfVehiclesList"></div>
+                </div>
+            </div>
+        </section>
+    </main>
+</div>
+
+<!-- Toast -->
+<div id="sfToast"></div>
+
+<!-- Receive Items Modal -->
+<div class="sf-modal" id="sfReceiveModal">
+    <div class="sf-modal-content" style="max-width:480px;">
+        <div class="sf-modal-header blue">
+            <div>
+                <div class="sf-modal-title">📥 Receive Items</div>
+                <div class="sf-modal-sub">Update stock from delivery</div>
+            </div>
+            <button class="sf-modal-close" onclick="sfCloseReceiveModal()">&times;</button>
+        </div>
+        <div class="sf-modal-body">
+            <div class="sf-form-group">
+                <label class="sf-label">Search Item</label>
+                <input type="text" id="sfReceiveSearch" class="sf-input" placeholder="Item name or code..." oninput="sfSearchReceiveItem()">
+            </div>
+            <div id="sfReceiveInfo" style="display:none;background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;padding:14px;margin-bottom:16px;">
+                <div style="font-size:11px;font-weight:700;color:#16a34a;text-transform:uppercase;margin-bottom:8px;">✅ Item Found</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                    <div><div style="font-size:10px;color:#718096;font-weight:600;text-transform:uppercase;">Item</div><div style="font-weight:700;font-size:13px;" id="sfReceiveItemName">—</div></div>
+                    <div><div style="font-size:10px;color:#718096;font-weight:600;text-transform:uppercase;">Current Stock</div><div style="font-weight:700;font-size:13px;" id="sfReceiveCurrentStock">—</div></div>
+                </div>
+            </div>
+            <div class="sf-form-group">
+                <label class="sf-label">Quantity Received *</label>
+                <input type="number" id="sfReceiveQty" class="sf-input" placeholder="0" min="1">
+            </div>
+            <div style="display:flex;gap:10px;margin-top:8px;">
+                <button class="sf-btn sf-btn-secondary" style="flex:1;" onclick="sfCloseReceiveModal()">Cancel</button>
+                <button class="sf-btn sf-btn-success" style="flex:2;" onclick="sfSubmitReceive()">✅ Confirm & Update Stock</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New Service Modal -->
+<div class="sf-modal" id="sfNewServiceModal">
+    <div class="sf-modal-content" style="max-width:520px;">
+        <div class="sf-modal-header">
+            <div>
+                <div class="sf-modal-title">🔧 New Service</div>
+                <div class="sf-modal-sub">Create service transaction</div>
+            </div>
+            <button class="sf-modal-close" onclick="sfCloseNewServiceModal()">&times;</button>
+        </div>
+        <div class="sf-modal-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div class="sf-form-group">
+                    <label class="sf-label">Plate Number *</label>
+                    <input type="text" id="sfSvcPlate" class="sf-input" placeholder="e.g. ABC-1234" style="text-transform:uppercase;">
+                </div>
+                <div class="sf-form-group">
+                    <label class="sf-label">Mechanic Name *</label>
+                    <input type="text" id="sfSvcMechanic" class="sf-input" placeholder="Enter mechanic name...">
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div class="sf-form-group">
+                    <label class="sf-label">Date Serviced *</label>
+                    <input type="date" id="sfSvcDate" class="sf-input">
+                </div>
+                <div class="sf-form-group">
+                    <label class="sf-label">Status</label>
+                    <select id="sfSvcStatus" class="sf-input">
+                        <option value="Ongoing">Ongoing</option>
+                        <option value="Completed">Completed</option>
+                        <option value="Pending">Pending</option>
+                    </select>
+                </div>
+            </div>
+            <div class="sf-form-group">
+                <label class="sf-label">Description</label>
+                <input type="text" id="sfSvcDesc" class="sf-input" placeholder="e.g. Change oil, brake inspection...">
+            </div>
+            <div class="sf-form-group">
+                <label class="sf-label">Total Cost (₱)</label>
+                <input type="number" id="sfSvcCost" class="sf-input" placeholder="0.00" min="0" step="0.01">
+            </div>
+            <div style="display:flex;gap:10px;margin-top:8px;">
+                <button class="sf-btn sf-btn-secondary" style="flex:1;" onclick="sfCloseNewServiceModal()">Cancel</button>
+                <button class="sf-btn sf-btn-primary" style="flex:2;" onclick="sfSubmitService()">💾 Save Service</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Vehicle Modal -->
+<div class="sf-modal" id="sfAddVehicleModal">
+    <div class="sf-modal-content" style="max-width:480px;">
+        <div class="sf-modal-header">
+            <div>
+                <div class="sf-modal-title">🚗 Add New Vehicle</div>
+                <div class="sf-modal-sub">Fill in the vehicle details</div>
+            </div>
+            <button class="sf-modal-close" onclick="sfCloseAddVehicleModal()">&times;</button>
+        </div>
+        <div class="sf-modal-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div class="sf-form-group">
+                    <label class="sf-label">Plate Number *</label>
+                    <input type="text" id="sfVPlate" class="sf-input" placeholder="e.g. ABC-1234" style="text-transform:uppercase;">
+                </div>
+                <div class="sf-form-group">
+                    <label class="sf-label">Owner *</label>
+                    <input type="text" id="sfVOwner" class="sf-input" placeholder="e.g. Juan Dela Cruz">
+                </div>
+            </div>
+            <div class="sf-form-group">
+                <label class="sf-label">Description *</label>
+                <input type="text" id="sfVDesc" class="sf-input" placeholder="e.g. Isuzu Truck NQR 2021">
+            </div>
+            <div class="sf-form-group">
+                <label class="sf-label">Current Odometer (km)</label>
+                <input type="number" id="sfVOdo" class="sf-input" placeholder="e.g. 45000" min="0">
+            </div>
+            <div style="display:flex;gap:10px;margin-top:8px;">
+                <button class="sf-btn sf-btn-secondary" style="flex:1;" onclick="sfCloseAddVehicleModal()">Cancel</button>
+                <button class="sf-btn sf-btn-primary" style="flex:2;" onclick="sfSubmitAddVehicle()">💾 Save Vehicle</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+  firebase.initializeApp({
+    apiKey: "AIzaSyCaoJWbwJk0Xi694ARHpdHhiNjT0SpASRs",
+    authDomain: "caltex-autopro-1e664.firebaseapp.com",
+    projectId: "caltex-autopro-1e664",
+    storageBucket: "caltex-autopro-1e664.firebasestorage.app",
+    messagingSenderId: "930140433367",
+    appId: "1:930140433367:web:cf67bfa388fa517422b992"
+  });
+</script>
+<script src="../static/js/staff_dashboard.js"></script>
+</body>
+</html>

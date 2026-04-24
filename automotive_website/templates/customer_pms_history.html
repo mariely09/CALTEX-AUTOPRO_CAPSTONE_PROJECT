@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoPro – PMS History</title>
+    <link rel="stylesheet" href="../static/css/customer_dashboard.css">
+    <style>
+        .ph-vehicle-card {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.06);
+            margin-bottom: 14px;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            cursor: pointer;
+            transition: transform .2s, box-shadow .2s;
+        }
+        .ph-vehicle-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.09); }
+        .ph-vehicle-icon {
+            width: 46px; height: 46px;
+            background: rgba(232,0,28,0.08);
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+            color: #E8001C;
+        }
+        .ph-plate { font-size: 14px; font-weight: 700; color: #1a202c; }
+        .ph-desc  { font-size: 11px; color: #718096; margin-top: 2px; }
+        .ph-records { font-size: 11px; color: #718096; margin-top: 4px; display: flex; align-items: center; gap: 4px; }
+        .ph-cost { font-size: 13px; font-weight: 700; color: #1a202c; }
+        .ph-cost-label { font-size: 9px; color: #718096; }
+
+        /* History modal */
+        .ph-modal {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px);
+            z-index: 500;
+            align-items: flex-end;
+            justify-content: center;
+        }
+        .ph-modal.active { display: flex; }
+        .ph-modal-content {
+            background: #F7F8FA;
+            border-radius: 24px 24px 0 0;
+            width: 100%; max-width: 640px;
+            max-height: 88vh;
+            overflow-y: auto;
+            animation: cuSlideUp .25s ease;
+        }
+        .ph-modal-header {
+            background: #E8001C;
+            padding: 20px;
+            border-radius: 24px 24px 0 0;
+            text-align: center;
+            position: sticky; top: 0; z-index: 1;
+        }
+        .ph-modal-close-row { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+        .ph-modal-close {
+            background: rgba(255,255,255,0.2); border: none; color: white;
+            width: 28px; height: 28px; border-radius: 14px; font-size: 16px;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+        }
+        .ph-modal-body { padding: 16px; }
+        .ph-record-card {
+            background: #fff;
+            border-radius: 14px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            margin-bottom: 14px;
+            overflow: hidden;
+        }
+        .ph-record-header {
+            background: #f7f8fa;
+            padding: 12px 14px;
+            display: flex; align-items: center; justify-content: space-between;
+            border-bottom: 1px solid #f0f4f8;
+        }
+        .ph-record-body { padding: 14px; }
+        .ph-section-label {
+            display: flex; align-items: center; gap: 6px;
+            font-size: 12px; font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .ph-line-item {
+            display: flex; align-items: center; gap: 8px;
+            font-size: 12px; color: #1a202c;
+            margin-bottom: 6px;
+        }
+        .ph-dot { width: 4px; height: 4px; border-radius: 50%; flex-shrink: 0; }
+    </style>
+</head>
+<body data-page="pms">
+
+<!-- Header (loaded dynamically) -->
+<div id="customerHeader"></div>
+
+<!-- Main -->
+<main class="cu-main">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E8001C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/></svg>
+        <span style="font-size:16px;font-weight:700;color:#1a202c;">PMS History</span>
+        <span style="font-size:12px;color:#718096;margin-left:auto;" id="phVehicleCount"></span>
+    </div>
+    <div id="phVehiclesList"></div>
+</main>
+
+<!-- History Modal -->
+<div class="ph-modal" id="phModal">
+    <div class="ph-modal-content">
+        <div class="ph-modal-header">
+            <div class="ph-modal-close-row">
+                <button class="ph-modal-close" onclick="phCloseModal()">&times;</button>
+            </div>
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+            <div style="color:white;font-size:16px;font-weight:700;margin-top:8px;" id="phModalDesc">—</div>
+            <div style="color:rgba(255,255,255,0.7);font-size:12px;" id="phModalPlate">—</div>
+            <div style="color:rgba(255,255,255,0.6);font-size:11px;margin-top:4px;" id="phModalCount">0 records</div>
+        </div>
+        <div class="ph-modal-body" id="phModalBody"></div>
+    </div>
+</div>
+
+<div id="cuToast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+  firebase.initializeApp({
+    apiKey: "AIzaSyCaoJWbwJk0Xi694ARHpdHhiNjT0SpASRs",
+    authDomain: "caltex-autopro-1e664.firebaseapp.com",
+    projectId: "caltex-autopro-1e664",
+    storageBucket: "caltex-autopro-1e664.firebasestorage.app",
+    messagingSenderId: "930140433367",
+    appId: "1:930140433367:web:cf67bfa388fa517422b992"
+  });
+
+  const stored = sessionStorage.getItem('cpUser');
+  if (!stored) { window.location.href = 'login.html'; }
+  const cpUser = JSON.parse(stored || '{}');
+  const db = firebase.firestore();
+
+  let _userName = '';
+  let _allRecords = [];
+
+  // Show loading immediately
+  document.getElementById('phVehiclesList').innerHTML =
+    '<div class="cu-empty" style="color:#718096;">Loading...</div>';
+
+  async function init(user) {
+    try {
+      if (!user) {
+        document.getElementById('phVehiclesList').innerHTML =
+          '<div class="cu-empty" style="color:#E8001C;">Session expired. <a href="login.html">Please log in again.</a></div>';
+        return;
+      }
+
+      // Get user name from Firestore (authenticated)
+      let userName = cpUser.name || '';
+      if (!userName) {
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        if (userDoc.exists) userName = userDoc.data().name || '';
+      }
+      if (!userName && cpUser.email) {
+        const snap = await db.collection('users').where('email', '==', cpUser.email).limit(1).get();
+        if (!snap.empty) userName = snap.docs[0].data().name || '';
+      }
+
+      _userName = userName;
+      const initials = _userName.split(' ').filter(Boolean).map(p => p[0]).join('').toUpperCase().slice(0, 2) || 'CU';
+      document.getElementById('cuAvatar').textContent = initials;
+
+      // ── Step 2: Load vehicles filtered by owner (exactly like Flutter) ──
+      const vSnap = await db.collection('vehicles').get();
+      const myVehicles = vSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(v => (v.owner || '').toLowerCase() === _userName.toLowerCase());
+
+      document.getElementById('phVehicleCount').textContent =
+        `${myVehicles.length} vehicle${myVehicles.length !== 1 ? 's' : ''}`;
+
+      const el = document.getElementById('phVehiclesList');
+      if (!myVehicles.length) {
+        el.innerHTML = `<div class="cu-empty">No vehicles registered under your name.<br><small style="color:#a0aec0;">(Logged in as: ${_userName || 'unknown'})</small></div>`;
+        return;
+      }
+
+      // ── Step 3: Load completed maintenance records per plate ──
+      const plates = myVehicles.map(v => v.plate).filter(Boolean);
+      if (plates.length) {
+        // Firestore 'in' supports max 10 items
+        const chunks = [];
+        for (let i = 0; i < plates.length; i += 10) chunks.push(plates.slice(i, i + 10));
+        const results = await Promise.all(
+          chunks.map(chunk =>
+            db.collection('maintenance')
+              .where('plate', 'in', chunk)
+              .where('status', '==', 'Completed')
+              .get()
+          )
+        );
+        _allRecords = results.flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() })));
+      }
+
+      // ── Step 4: Render vehicle cards ──
+      el.innerHTML = myVehicles.map(v => {
+        const records = _allRecords.filter(r => r.plate === v.plate);
+        const totalCost = records.reduce((sum, r) => {
+          const raw = r.cost || r.totalCost || '0';
+          const num = typeof raw === 'number' ? raw : parseFloat(String(raw).replace(/[₱,]/g, '')) || 0;
+          return sum + num;
+        }, 0);
+        const safeDesc = (v.desc || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        return `
+          <div class="ph-vehicle-card" onclick="phShowHistory('${v.plate}','${safeDesc}')">
+            <div class="ph-vehicle-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+            </div>
+            <div style="flex:1;">
+              <div class="ph-plate">${v.plate}</div>
+              <div class="ph-desc">${v.desc || '—'}</div>
+              <div class="ph-records">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                ${records.length} service record${records.length !== 1 ? 's' : ''}
+              </div>
+            </div>
+            <div style="text-align:right;">
+              <div class="ph-cost">₱${totalCost.toLocaleString('en-PH', {minimumFractionDigits:2})}</div>
+              <div class="ph-cost-label">total spent</div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#718096" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-top:6px;"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+          </div>`;
+      }).join('');
+
+    } catch (err) {
+      console.error('PMS History error:', err);
+      document.getElementById('phVehiclesList').innerHTML =
+        `<div class="cu-empty" style="color:#E8001C;">Error loading data: ${err.message}</div>`;
+    }
+  }
+
+  // Wait for Firebase Auth, then load data
+  firebase.auth().onAuthStateChanged((user) => {
+    if (user) init(user);
+    else window.location.href = 'login.html';
+  });
+
+  window.phShowHistory = function (plate, desc) {
+    const records = _allRecords.filter(r => r.plate === plate)
+      .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+
+    document.getElementById('phModalPlate').textContent = plate;
+    document.getElementById('phModalDesc').textContent = desc;
+    document.getElementById('phModalCount').textContent =
+      `${records.length} completed service${records.length !== 1 ? 's' : ''}`;
+
+    const body = document.getElementById('phModalBody');
+    if (!records.length) {
+      body.innerHTML = '<div class="cu-empty">No completed services yet.</div>';
+    } else {
+      body.innerHTML = records.map(r => {
+        const svcRows = (r.svcRows || []).filter(s => s.name);
+        const matRows = (r.matRows || []).filter(m => m.name);
+        return `
+          <div class="ph-record-card">
+            <div class="ph-record-header">
+              <div style="display:flex;align-items:center;gap:6px;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#718096" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <strong style="font-size:13px;color:#1a202c;">${r.date || '—'}</strong>
+              </div>
+              <span style="background:#f0fdf4;color:#16a34a;font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;">Completed</span>
+            </div>
+            <div class="ph-record-body">
+              <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:#718096;margin-bottom:10px;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                Mechanic: ${r.mechanic || '—'}
+              </div>
+              ${svcRows.length ? `
+                <div class="ph-section-label" style="color:#2b6cb0;">
+                  <span style="background:#ebf8ff;padding:3px 5px;border-radius:6px;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#2b6cb0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                  </span>
+                  Services Rendered
+                </div>
+                ${svcRows.map(s => `
+                  <div class="ph-line-item">
+                    <div class="ph-dot" style="background:#2b6cb0;"></div>
+                    <span style="flex:1;">${s.name}</span>
+                    <span style="color:#718096;">${s.qty} ${s.uom}</span>
+                  </div>`).join('')}
+              ` : ''}
+              ${matRows.length ? `
+                <div class="ph-section-label" style="color:#0d9488;margin-top:10px;">
+                  <span style="background:#f0fdfa;padding:3px 5px;border-radius:6px;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                  </span>
+                  Materials Used
+                </div>
+                ${matRows.map(m => `
+                  <div class="ph-line-item">
+                    <div class="ph-dot" style="background:#0d9488;"></div>
+                    <span style="flex:1;">${m.name}</span>
+                    <span style="color:#718096;">${m.qty} ${m.uom}</span>
+                  </div>`).join('')}
+              ` : ''}
+              <hr style="border:none;border-top:1px solid #e2e8f0;margin:12px 0;">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-size:13px;font-weight:600;color:#4a5568;">Total</span>
+                <span style="font-size:15px;font-weight:700;color:#E8001C;">${
+                  r.totalCost
+                    ? '₱' + parseFloat(r.totalCost).toLocaleString('en-PH', {minimumFractionDigits:2})
+                    : (r.cost || '—')
+                }</span>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+    }
+    document.getElementById('phModal').classList.add('active');
+  };
+
+  window.phCloseModal = function () {
+    document.getElementById('phModal').classList.remove('active');
+  };
+  document.getElementById('phModal').addEventListener('click', function (e) {
+    if (e.target === this) phCloseModal();
+  });
+
+</script>
+<script>
+  fetch('customer_header.html').then(r => r.text()).then(html => {
+    document.getElementById('customerHeader').innerHTML = html;
+  });
+</script>
+</body>
+</html>

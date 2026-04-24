@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Domain Management – AutoPro Admin</title>
+    <link rel="stylesheet" href="../static/css/style.css">
+    <link rel="stylesheet" href="../static/css/admin.css">
+</head>
+<body class="portal-body" data-page="domains">
+
+<div class="admin-dashboard" style="display:flex;">
+    <div id="sidebarContainer"></div>
+
+    <div class="admin-main">
+        <div class="admin-header">
+            <div>
+                <div class="breadcrumb">Admin Portal</div>
+                <div class="admin-header-title">Domain Management</div>
+            </div>
+            <div class="admin-header-actions">
+                <button class="btn-icon btn-primary" onclick="openAddDomainModal()"><span>➕</span> Add Domain</button>
+            </div>
+        </div>
+
+        <div class="admin-content">
+            <div style="margin-bottom:1.5rem;">
+                <p style="color:#718096;font-size:0.95rem;">Manage dropdown value lists used across the system.</p>
+            </div>
+
+            <div class="data-table">
+                <div class="table-header">
+                    <span>Domains</span>
+                    <div class="table-actions">
+                        <input type="text" class="search-bar" placeholder="Search domains..." id="domainSearch" oninput="renderDomainsList()">
+                        <button class="btn-icon btn-primary" onclick="openAddDomainModal()"><span>➕</span> Add Domain</button>
+                    </div>
+                </div>
+                <div class="table-row" style="background:#f7fafc;font-weight:bold;border-bottom:2px solid #e2e8f0;grid-template-columns:40px 1.5fr 3fr 120px;">
+                    <div>#</div><div>Domain Name</div><div>Values</div><div>Actions</div>
+                </div>
+                <div id="domainsList"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Domain Modal -->
+<div class="modal" id="addDomainModal">
+    <div class="modal-content" style="max-width:600px;">
+        <div class="modal-header">
+            <h2 id="domainModalTitle">Add Domain</h2>
+            <button class="close-btn" onclick="closeModal('addDomainModal')">&times;</button>
+        </div>
+        <form id="addDomainForm">
+            <div class="form-group"><label>Domain Name *</label><input type="text" name="domainName" placeholder="e.g., Asset Type" required></div>
+            <div class="form-group">
+                <label>Domain List (Comma Separated) *</label>
+                <textarea name="domainList" rows="3" placeholder="e.g., Car, Truck, Bus, Van" required></textarea>
+                <small style="color:#718096;">Enter values separated by commas.</small>
+            </div>
+            <div style="display:flex;gap:1rem;margin-top:2rem;">
+                <button type="button" class="btn-secondary" style="flex:1;" onclick="closeModal('addDomainModal')">Cancel</button>
+                <button type="submit" class="btn-primary" style="flex:1;">Save Domain</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="../static/js/data.js"></script>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+  if (!firebase.apps.length) {
+    firebase.initializeApp({
+      apiKey: "AIzaSyCaoJWbwJk0Xi694ARHpdHhiNjT0SpASRs",
+      authDomain: "caltex-autopro-1e664.firebaseapp.com",
+      projectId: "caltex-autopro-1e664",
+      storageBucket: "caltex-autopro-1e664.firebasestorage.app",
+      messagingSenderId: "930140433367",
+      appId: "1:930140433367:web:cf67bfa388fa517422b992"
+    });
+  }
+</script>
+<script src="../static/js/admin_firebase.js"></script>
+
+<script src="../static/js/admin_functions.js"></script>
+<script src="../static/js/admin.js"></script>
+<script>
+    fetch('admin_sidebar.html').then(r => r.text()).then(html => {
+        document.getElementById('sidebarContainer').innerHTML = html;
+    });
+</script>
+</body>
+</html>

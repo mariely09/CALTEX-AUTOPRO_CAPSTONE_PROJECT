@@ -1,0 +1,337 @@
+(function () {
+  'use strict';
+
+  // ── Auth guard ──────────────────────────────────────────
+  const stored = sessionStorage.getItem('cpUser');
+  if (!stored) { window.location.href = 'login.html'; return; }
+  const cpUser = JSON.parse(stored);
+
+  const db   = firebase.firestore();
+  const auth = firebase.auth();
+
+  let _userName = '';
+  let _vehicles = [];
+
+  // ── Init ────────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', () => {
+    // Show loading state immediately
+    document.getElementById('cuVehiclesList').innerHTML =
+      '<div class="cu-empty" style="color:#718096;">Loading...</div>';
+
+    // Wait for Firebase Auth before querying Firestore
+    firebase.auth().onAuthStateChanged((user) => {
+      if (user) {
+        loadUserInfo(user);
+      } else {
+        window.location.href = 'login.html';
+      }
+    });
+  });
+
+  // ── User info ────────────────────────────────────────────
+  async function loadUserInfo(user) {
+    // Use stored name immediately — fast path
+    _userName = cpUser.name || '';
+
+    if (!_userName) {
+      // Fetch from Firestore (authenticated)
+      const userDoc = await db.collection('users').doc(user.uid).get();
+      if (userDoc.exists) _userName = userDoc.data().name || '';
+    }
+    if (!_userName && cpUser.email) {
+      const snap = await db.collection('users').where('email', '==', cpUser.email).limit(1).get();
+      if (!snap.empty) _userName = snap.docs[0].data().name || '';
+    }
+
+    const initials = _userName.split(' ').filter(Boolean).map(p => p[0]).join('').toUpperCase().slice(0, 2) || 'CU';
+    document.getElementById('cuAvatar').textContent = initials;
+    loadVehicles();
+  }
+
+  // ── Vehicles ─────────────────────────────────────────────
+  function loadVehicles() {
+    db.collection('vehicles').onSnapshot(snap => {
+      const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      // Filter by owner name — exact match like Flutter
+      _vehicles = all.filter(v => {
+        const owner = (v.owner || '').toLowerCase().trim();
+        const name = _userName.toLowerCase().trim();
+        return owner === name;
+      });
+
+      updateStats();
+      renderVehicles();
+    });
+  }
+
+  function computeStatus(v) {
+    if (v.status === 'Under Maintenance') return 'Under Maintenance';
+    const lastSvc = v.lastSvcDate || '';
+    const freq = parseInt(v.svcFreq) || 0;
+    if (!lastSvc || !freq) return v.status || 'Active';
+    const date = new Date(lastSvc);
+    if (isNaN(date)) return v.status || 'Active';
+    const next = new Date(date);
+    next.setMonth(next.getMonth() + freq);
+    const days = Math.floor((next - new Date()) / 86400000);
+    if (days < 0) return 'Overdue';
+    if (days <= 30) return 'PMS Due Soon';
+    return 'Active';
+  }
+
+  function updateStats() {
+    const statuses = _vehicles.map(v => computeStatus(v));
+    document.getElementById('cuTotalVehicles').textContent = _vehicles.length;
+    document.getElementById('cuMaintenance').textContent = statuses.filter(s => s === 'Under Maintenance').length;
+    document.getElementById('cuOverdue').textContent = statuses.filter(s => s === 'Overdue').length;
+    document.getElementById('cuDueSoon').textContent = statuses.filter(s => s === 'PMS Due Soon').length;
+  }
+
+  function renderVehicles() {
+    const el = document.getElementById('cuVehiclesList');
+    if (!_vehicles.length) {
+      el.innerHTML = '<div class="cu-empty">No vehicles registered under your name.</div>';
+      return;
+    }
+
+    el.innerHTML = _vehicles.map(v => {
+      const status = computeStatus(v);
+      const statusColor = status === 'Active' ? '#16a34a'
+        : status === 'Under Maintenance' ? '#ea580c'
+        : status === 'Overdue' ? '#E8001C'
+        : status === 'PMS Due Soon' ? '#d97706'
+        : '#718096';
+      const statusLabel = status === 'PMS Due Soon' ? 'Due Soon' : status;
+
+      return `
+        <div class="cu-vehicle-card" onclick="cuShowVehicle('${v.id}')">
+          <div class="cu-vehicle-top">
+            <div class="cu-vehicle-icon">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+            </div>
+            <div style="flex:1;">
+              <div class="cu-vehicle-plate">${v.plate || '—'}</div>
+              <div class="cu-vehicle-desc">${v.desc || '—'}</div>
+            </div>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#cbd5e0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </div>
+          <div class="cu-vehicle-bottom">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 5v5l3 3"/></svg>
+            ${v.odo ? v.odo + ' km' : '—'}
+            <div class="cu-vb-divider"></div>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            ${v.lastSvcDate || '—'}
+            <div class="cu-vb-divider"></div>
+            <span class="cu-status-dot" style="background:${statusColor};"></span>
+            <span style="color:${statusColor};font-weight:600;">${statusLabel}</span>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  // ── Vehicle modal ─────────────────────────────────────────
+  window.cuShowVehicle = function (id) {
+    const v = _vehicles.find(x => x.id === id);
+    if (!v) return;
+
+    const status = computeStatus(v);
+    const statusColor = status === 'Active' ? '#16a34a'
+      : status === 'Under Maintenance' ? '#ea580c'
+      : status === 'Overdue' ? '#E8001C'
+      : status === 'PMS Due Soon' ? '#d97706'
+      : '#718096';
+
+    // Compute next PMS
+    let nextPms = '—';
+    let daysUntil = null;
+    if (v.lastSvcDate && v.svcFreq) {
+      const date = new Date(v.lastSvcDate);
+      const months = parseInt(v.svcFreq);
+      if (!isNaN(date) && months) {
+        const next = new Date(date);
+        next.setMonth(next.getMonth() + months);
+        nextPms = next.toISOString().split('T')[0];
+        daysUntil = Math.floor((next - new Date()) / 86400000);
+      }
+    }
+
+    let statusLabel = status;
+    if (daysUntil !== null && status !== 'Under Maintenance') {
+      if (daysUntil < 0) statusLabel = `Overdue (${Math.abs(daysUntil)} days ago)`;
+      else if (daysUntil === 0) statusLabel = 'Due Today';
+      else statusLabel = `${status} (${daysUntil} days remaining)`;
+    }
+
+    document.getElementById('cuModalPlate').textContent = v.plate || '—';
+    document.getElementById('cuModalDesc').textContent = v.desc || '—';
+
+    document.getElementById('cuModalDetails').innerHTML = `
+      ${detailRow('#718096', 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 5v5l3 3', 'Odometer', v.odo ? v.odo + ' km' : '—')}
+      ${detailRow('#2b6cb0', 'M3 4h18v18H3zM16 2v4M8 2v4M3 10h18', 'Last Service', v.lastSvcDate || '—')}
+      ${detailRow(statusColor, 'M8 6l4-4 4 4M8 18l4 4 4-4M4 12h16', 'Next PMS Due', nextPms)}
+      ${detailRow(statusColor, 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z', 'Status', statusLabel)}
+    `;
+
+    document.getElementById('cuVehicleModal').classList.add('active');
+  };
+
+  function detailRow(color, svgPath, label, value) {
+    return `
+      <div class="cu-detail-row">
+        <div class="cu-detail-icon" style="background:${color}18;color:${color};">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${svgPath}"/></svg>
+        </div>
+        <div>
+          <div class="cu-detail-label">${label}</div>
+          <div class="cu-detail-value" style="color:${label === 'Status' || label === 'Next PMS Due' ? color : '#1a202c'};">${value}</div>
+        </div>
+      </div>`;
+  }
+
+  window.cuCloseModal = function () {
+    document.getElementById('cuVehicleModal').classList.remove('active');
+  };
+
+  // Close modal on backdrop click
+  document.getElementById('cuVehicleModal').addEventListener('click', function (e) {
+    if (e.target === this) cuCloseModal();
+  });
+
+  // ── Helpers ──────────────────────────────────────────────
+  window.cuShowNotifications = function () { /* future */ };
+  window.cuShowProfile = function () { /* future */ };
+
+  window.sfLogout = window.cuLogout = function () {
+    if (!confirm('Are you sure you want to logout?')) return;
+    auth.signOut().then(() => {
+      sessionStorage.removeItem('cpUser');
+      window.location.href = 'login.html';
+    });
+  };
+
+  // ── Smart AI Modal ────────────────────────────────────────
+  let _aiLoaded = false, _aiVehicles = [], _aiMaintenance = [];
+
+  window.cuOpenAI = function () {
+    document.getElementById('cuAIOverlay').classList.add('active');
+    if (!_aiLoaded) _loadAIData();
+  };
+
+  window.cuCloseAI = function () {
+    document.getElementById('cuAIOverlay').classList.remove('active');
+  };
+
+  window.cuClearAI = function () {
+    const msgs = document.getElementById('cuAIMessages');
+    const welcome = document.getElementById('cuAIWelcome');
+    msgs.innerHTML = '';
+    msgs.appendChild(welcome);
+    welcome.style.display = 'block';
+    document.getElementById('cuAIChips').style.display = 'flex';
+    document.getElementById('cuAIClearBtn').style.display = 'none';
+  };
+
+  async function _loadAIData() {
+    _aiVehicles = _vehicles; // reuse already-loaded vehicles
+    if (_aiVehicles.length) {
+      const plates = _aiVehicles.map(v => v.plate).filter(Boolean).slice(0, 10);
+      try {
+        const mSnap = await db.collection('maintenance').where('plate', 'in', plates).get();
+        _aiMaintenance = mSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      } catch(e) { console.error('AI data load:', e); }
+    }
+    const sub = document.getElementById('cuAIWelcomeSub');
+    if (sub) sub.textContent = _aiVehicles.length
+      ? `Ask me anything about your ${_aiVehicles.length} vehicle${_aiVehicles.length !== 1 ? 's' : ''} — PMS status, maintenance history, and more.`
+      : 'No vehicles found under your account.';
+    _aiLoaded = true;
+  }
+
+  function _aiProcessQuery(q) {
+    const ql = q.toLowerCase();
+    if (!_aiVehicles.length) return 'No vehicles are registered under your name yet.';
+    if (ql.includes('maintenance') || ql.includes('serviced')) {
+      const list = _aiVehicles.filter(v => (v.status || '').toLowerCase().includes('maintenance'));
+      return list.length ? 'Under maintenance:\n' + list.map(v => `• ${v.plate} — ${v.desc}`).join('\n')
+        : 'None of your vehicles are currently under maintenance. ✅';
+    }
+    if (ql.includes('overdue') || ql.includes('past due')) {
+      const list = _aiVehicles.filter(v => v.status === 'Overdue');
+      return list.length ? 'PMS Overdue:\n' + list.map(v => `• ${v.plate} — ${v.desc}`).join('\n') + '\n\nPlease schedule a service soon!'
+        : 'No vehicles are overdue for PMS. ✅';
+    }
+    if (ql.includes('due soon') || ql.includes('upcoming')) {
+      const list = _aiVehicles.filter(v => v.status === 'PMS Due Soon');
+      return list.length ? 'PMS Due Soon:\n' + list.map(v => `• ${v.plate} — ${v.desc}`).join('\n')
+        : 'No vehicles have PMS due soon. ✅';
+    }
+    if (ql.includes('history') || ql.includes('service record') || ql.includes('completed')) {
+      const done = _aiMaintenance.filter(m => (m.status || '').toLowerCase() === 'completed');
+      if (!done.length) return 'No completed service records found for your vehicles.';
+      const total = done.reduce((s, r) => {
+        const raw = r.totalCost || r.cost || '0';
+        return s + (typeof raw === 'number' ? raw : parseFloat(String(raw).replace(/[₱,]/g, '')) || 0);
+      }, 0);
+      return `You have ${done.length} completed service record${done.length !== 1 ? 's' : ''}.\nTotal spent: ₱${total.toLocaleString('en-PH', {minimumFractionDigits:2})}\n\nGo to "PMS History" tab to view full details.`;
+    }
+    if (ql.includes('summary') || ql.includes('status') || ql.includes('report')) {
+      const active = _aiVehicles.filter(v => v.status === 'Active').length;
+      const maint  = _aiVehicles.filter(v => (v.status || '').includes('Maintenance')).length;
+      const over   = _aiVehicles.filter(v => v.status === 'Overdue').length;
+      const soon   = _aiVehicles.filter(v => v.status === 'PMS Due Soon').length;
+      return `Fleet Summary:\n✅ Active: ${active}\n🔧 Under Maintenance: ${maint}\n⚠️ PMS Overdue: ${over}\n📅 Due Soon: ${soon}\n🚗 Total: ${_aiVehicles.length}`;
+    }
+    if (ql.includes('vehicle') || ql.includes('fleet') || ql.includes('list') || ql.includes('all my')) {
+      const lines = _aiVehicles.map(v => {
+        const e = v.status === 'Active' ? '✅' : v.status === 'Under Maintenance' ? '🔧' : v.status === 'Overdue' ? '⚠️' : v.status === 'PMS Due Soon' ? '📅' : '•';
+        return `${e} ${v.plate} — ${v.desc} (${v.status || 'Active'})`;
+      }).join('\n');
+      return `Your fleet (${_aiVehicles.length} vehicle${_aiVehicles.length !== 1 ? 's' : ''}):\n${lines}`;
+    }
+    return 'I can help you with:\n• Vehicle status & fleet summary\n• PMS overdue or due soon\n• Vehicles under maintenance\n• Service history & total cost\n\nTry asking: "Which vehicles are overdue?"';
+  }
+
+  window.cuAISend = function (preset) {
+    const input = document.getElementById('cuAIInput');
+    const text = (preset || input.value).trim();
+    if (!text) return;
+
+    document.getElementById('cuAIWelcome').style.display = 'none';
+    document.getElementById('cuAIChips').style.display = 'none';
+    document.getElementById('cuAIClearBtn').style.display = 'block';
+
+    const msgs = document.getElementById('cuAIMessages');
+    const userBubble = document.createElement('div');
+    userBubble.className = 'cu-ai-bubble user';
+    userBubble.textContent = text;
+    msgs.appendChild(userBubble);
+    input.value = '';
+    input.style.height = 'auto';
+    userBubble.scrollIntoView({ behavior: 'smooth' });
+
+    if (!_aiLoaded) {
+      const b = document.createElement('div');
+      b.className = 'cu-ai-bubble bot';
+      b.textContent = 'Loading your fleet data, please try again in a moment.';
+      msgs.appendChild(b);
+      return;
+    }
+
+    const typing = document.createElement('div');
+    typing.className = 'cu-ai-typing';
+    typing.innerHTML = '<span></span><span></span><span></span>';
+    msgs.appendChild(typing);
+    typing.scrollIntoView({ behavior: 'smooth' });
+
+    setTimeout(() => {
+      typing.remove();
+      const botBubble = document.createElement('div');
+      botBubble.className = 'cu-ai-bubble bot';
+      botBubble.textContent = _aiProcessQuery(text);
+      msgs.appendChild(botBubble);
+      botBubble.scrollIntoView({ behavior: 'smooth' });
+    }, 500);
+  };
+
+})();
