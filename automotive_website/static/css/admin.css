@@ -1,65 +1,123 @@
-/* ── Sidebar header — matches Flutter AppBar style ── */
-.admin-sidebar-header {
+/* ── Admin Top Bar — matches customer header style ── */
+.admin-topbar {
     background: #E8001C;
-    padding: 1.25rem 1.5rem 1rem;
-    border-bottom: none;
-    text-align: left;
-}
-
-.sidebar-topbar {
+    height: 60px;
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 6px;
-}
-
-.sidebar-logo-img {
-    width: 36px;
-    height: 36px;
-    object-fit: contain;
+    justify-content: space-between;
+    padding: 0 20px;
+    position: sticky;
+    top: 0;
+    z-index: 200;
     flex-shrink: 0;
 }
 
-.sidebar-brand {
+.admin-topbar-left {
     display: flex;
-    flex-direction: column;
-    gap: 2px;
+    align-items: center;
+    gap: 12px;
 }
 
-.sidebar-wordmark {
-    height: 18px;
-    object-fit: contain;
+.admin-menu-btn {
+    background: rgba(255,255,255,0.15);
+    border: none;
+    border-radius: 8px;
+    width: 36px; height: 36px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    color: white;
+    transition: background .2s;
+    flex-shrink: 0;
+}
+.admin-menu-btn:hover { background: rgba(255,255,255,0.28); }
+
+.admin-topbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
-.sidebar-autopro {
-    color: rgba(255,255,255,0.7);
-    font-size: 11px;
+.admin-topbar-logo { width: 36px; height: 36px; object-fit: contain; }
+.admin-topbar-text { display: flex; flex-direction: column; gap: 1px; }
+.admin-topbar-wordmark { height: 16px; object-fit: contain; }
+.admin-topbar-autopro { font-size: 10px; color: rgba(255,255,255,0.7); font-weight: 700; letter-spacing: 2px; }
+
+.admin-topbar-actions { display: flex; align-items: center; gap: 8px; }
+
+.admin-notif-btn {
+    background: rgba(255,255,255,0.15);
+    border: none;
+    border-radius: 50%;
+    width: 36px; height: 36px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    color: white;
+    position: relative;
+    transition: background .2s;
+}
+.admin-notif-btn:hover { background: rgba(255,255,255,0.25); }
+
+.admin-notif-badge {
+    position: absolute;
+    top: 4px; right: 4px;
+    background: #fff;
+    color: #E8001C;
+    font-size: 9px;
+    font-weight: 800;
+    min-width: 14px;
+    height: 14px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 3px;
+}
+
+.admin-avatar {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.25);
+    color: white;
+    font-size: 12px;
     font-weight: 700;
-    letter-spacing: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    overflow: hidden;
 }
+.admin-avatar img { width: 100%; height: 100%; object-fit: cover; }
 
-.admin-sidebar-header .admin-subtitle {
-    color: rgba(255,255,255,0.55);
-    font-size: 0.72rem;
-    font-weight: 600;
-    letter-spacing: 0.3px;
-    margin-top: 2px;
-    padding-left: 46px;
+/* ── Sidebar overlay ── */
+.admin-sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    z-index: 299;
 }
+.admin-sidebar-overlay.active { display: block; }
 
-/* ── Sidebar nav — Flutter-style active state ── */
+/* ── Sidebar drawer ── */
+
+/* ── Sidebar nav — active state ── */
 .admin-nav-btn.active {
     background: rgba(232,0,28,0.08);
     color: #E8001C;
-    font-weight: 700;
-    border-left: 3px solid #E8001C;
-    border-radius: 0 8px 8px 0;
-    padding-left: calc(1rem - 3px);
+    font-weight: 600;
+}
+
+.admin-nav-btn.active .admin-nav-icon svg {
+    stroke: #E8001C;
 }
 
 .admin-nav-btn:hover:not(.active) {
     background: #f7f8fa;
     color: #1a202c;
+}
+
+.admin-nav-btn:hover:not(.active) .admin-nav-icon svg {
+    stroke: #1a202c;
 }
 
 /* ── Sidebar footer — user info ── */
@@ -140,14 +198,20 @@
     margin-bottom: 0.15rem;
 }
 
-/* ── Stat cards — Flutter-style ── */
+/* ── Stat cards — Mobile app style ── */
 .stat-card {
     background: white;
     border-radius: 14px;
-    padding: 1.25rem;
+    padding: 1.1rem 0.75rem;
     box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     border: 1px solid #e2e8f0;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 0.4rem;
 }
 
 .stat-card:hover {
@@ -156,36 +220,40 @@
 }
 
 .stat-icon {
-    width: 40px;
-    height: 40px;
+    width: 38px;
+    height: 38px;
     border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.2rem;
-    margin-bottom: 0.85rem;
+    margin-bottom: 0.3rem;
+    flex-shrink: 0;
 }
 
-.stat-icon.blue   { background: rgba(0,48,135,0.08); color: #003087; }
-.stat-icon.green  { background: #f0fdf4; color: #16a34a; }
+.stat-icon.blue   { background: rgba(0,48,135,0.10); color: #003087; }
+.stat-icon.green  { background: rgba(44,122,123,0.10); color: #2c7a7b; }
 .stat-icon.red    { background: rgba(232,0,28,0.08); color: #E8001C; }
-.stat-icon.orange { background: #fff7ed; color: #ea580c; }
+.stat-icon.orange { background: rgba(234,88,12,0.10); color: #ea580c; }
 
 .stat-number {
-    font-size: 1.8rem;
+    font-size: 1.6rem;
     font-weight: 800;
-    color: #1a202c;
     line-height: 1;
-    margin-bottom: 0.3rem;
 }
+
+.stat-card .stat-icon.blue   ~ .stat-number { color: #003087; }
+.stat-card .stat-icon.green  ~ .stat-number { color: #2c7a7b; }
+.stat-card .stat-icon.red    ~ .stat-number { color: #E8001C; }
+.stat-card .stat-icon.orange ~ .stat-number { color: #ea580c; }
 
 .stat-label {
-    font-size: 0.8rem;
+    font-size: 0.72rem;
     color: #718096;
     font-weight: 500;
+    line-height: 1.3;
 }
 
-.stat-change { font-size: 0.75rem; margin-top: 0.3rem; font-weight: 600; }
+.stat-change { font-size: 0.72rem; margin-top: 0.1rem; font-weight: 600; }
 .stat-change.positive { color: #16a34a; }
 .stat-change.negative { color: #E8001C; }
 
@@ -657,15 +725,24 @@
     padding: 0.7rem 1rem;
     background: transparent;
     border: none;
-    border-left: 3px solid transparent;
     border-radius: 0 8px 8px 0;
     color: #4a5568;
     font-size: 0.88rem;
     font-weight: 500;
     cursor: pointer;
     text-align: left;
-    transition: all 0.15s ease;
+    transition: background 0.15s ease, color 0.15s ease;
     font-family: inherit;
+}
+
+.admin-nav-section-label {
+    padding: 1rem 1rem 0.3rem 1rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #a0aec0;
+    user-select: none;
 }
 
 .admin-nav-btn.submenu-item {
@@ -676,8 +753,7 @@
 
 .admin-nav-btn.submenu-item.active {
     color: #E8001C;
-    background: rgba(232,0,28,0.06);
-    border-left-color: #E8001C;
+    font-weight: 600;
 }
 
 /* ── Sidebar width tweak for SVG icons ── */
@@ -690,6 +766,33 @@
 .portal-body {
     margin: 0;
     padding: 0;
-    overflow: hidden;
     background: #f7f8fa;
 }
+
+/* ── Toast notification ── */
+#toast {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    padding: 0.75rem 1.5rem;
+    border-radius: 10px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: white;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    z-index: 99999;
+    white-space: nowrap;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+}
+
+#toast.toast-visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+#toast.toast-success { background: #16a34a; }
+#toast.toast-error   { background: #E8001C; }
+#toast.toast-info    { background: #2563eb; }

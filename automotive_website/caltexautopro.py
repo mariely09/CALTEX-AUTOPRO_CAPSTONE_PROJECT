@@ -58,6 +58,10 @@ def admin_domains():
 def admin_sidebar():
     return render_template('admin_sidebar.html')
 
+@app.route('/admin_header.html')
+def admin_header():
+    return render_template('admin_header.html')
+
 # ── Staff ────────────────────────────────────────────────────
 @app.route('/staff_dashboard.html')
 def staff_dashboard():

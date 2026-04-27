@@ -3,83 +3,133 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DSS – Stock Replenishment – AutoPro Admin</title>
+    <title>DSS – AutoPro Admin</title>
     <link rel="stylesheet" href="../static/css/style.css">
     <link rel="stylesheet" href="../static/css/admin.css">
 </head>
 <body class="portal-body" data-page="dss">
 
-<div class="admin-dashboard" style="display:flex;">
+<script>
+  (function() {
+    const hash = window.location.hash.replace('#', '');
+    const section = (hash === 'dss-pms') ? 'dss-pms' : 'dss';
+    document.body.setAttribute('data-page', section);
+  })();
+</script>
+
+<div class="admin-dashboard" style="display:flex;flex-direction:column;">
+    <div id="headerContainer"></div>
+    <div class="admin-dashboard-body">
     <div id="sidebarContainer"></div>
 
     <div class="admin-main">
         <div class="admin-header">
             <div>
                 <div class="breadcrumb">Admin Portal › Decision Support System</div>
-                <div class="admin-header-title">Stock Replenishment</div>
-            </div>
-            <div class="admin-header-actions">
-                <button class="btn-icon btn-secondary" onclick="renderDSS()"><span>🔄</span> Refresh</button>
+                <div class="admin-header-title" id="dssPageTitle">Stock Replenishment</div>
             </div>
         </div>
 
         <div class="admin-content">
-            <!-- Hero -->
-            <div class="dss-hero">
-                <div class="dss-hero-left">
-                    <div class="dss-hero-icon">🧠</div>
-                    <div>
-                        <div class="dss-hero-title">Decision Support System</div>
-                        <div class="dss-hero-sub">Stock Replenishment Intelligence</div>
+
+            <!-- Stock Replenishment Section -->
+            <div class="admin-section active" id="dss">
+                <div class="dss-hero">
+                    <div class="dss-hero-left">
+                        <div class="dss-hero-icon">🧠</div>
+                        <div>
+                            <div class="dss-hero-title">Decision Support System</div>
+                            <div class="dss-hero-sub">Stock Replenishment Intelligence</div>
+                        </div>
+                    </div>
+                    <button class="dss-refresh-btn" onclick="renderDSS()">🔄 Refresh Analysis</button>
+                </div>
+                <div class="dss-kpi-grid" id="dssKpiGrid"></div>
+                <div class="dss-filter-bar">
+                    <div class="dss-filter-group">
+                        <label class="dss-filter-label">Filter by Priority</label>
+                        <div class="dss-filter-pills" id="dssFilterPills">
+                            <button class="dss-pill active" onclick="dssSetFilter('all', this)">All</button>
+                            <button class="dss-pill critical" onclick="dssSetFilter('critical', this)">🚨 Critical</button>
+                            <button class="dss-pill warning" onclick="dssSetFilter('warning', this)">⚠️ Warning</button>
+                            <button class="dss-pill ok" onclick="dssSetFilter('ok', this)">✅ Adequate</button>
+                        </div>
+                    </div>
+                    <input type="text" class="dss-search" id="dssSearch" placeholder="🔍 Search item..." oninput="dssApplySearch()">
+                </div>
+                <div class="dss-table-wrap">
+                    <div class="dss-table-header">
+                        <span>📋 Replenishment Recommendations</span>
+                        <button class="dss-export-btn" onclick="dssPrintReport()">🖨️ Print Report</button>
+                    </div>
+                    <div style="overflow-x:auto;">
+                        <table class="dss-table">
+                            <thead>
+                                <tr>
+                                    <th>Item</th><th>Stock Status</th><th>Consumption Rate</th>
+                                    <th>Days of Stock Left</th><th>Recommended Order</th><th>Priority</th><th>Decision</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dssTableBody"></tbody>
+                        </table>
                     </div>
                 </div>
-                <button class="dss-refresh-btn" onclick="renderDSS()">🔄 Refresh Analysis</button>
             </div>
 
-            <!-- KPIs -->
-            <div class="dss-kpi-grid" id="dssKpiGrid"></div>
-
-            <!-- Filter bar -->
-            <div class="dss-filter-bar">
-                <div class="dss-filter-group">
-                    <label class="dss-filter-label">Filter by Priority</label>
-                    <div class="dss-filter-pills" id="dssFilterPills">
-                        <button class="dss-pill active" onclick="dssSetFilter('all', this)">All</button>
-                        <button class="dss-pill critical" onclick="dssSetFilter('critical', this)">🚨 Critical</button>
-                        <button class="dss-pill warning" onclick="dssSetFilter('warning', this)">⚠️ Warning</button>
-                        <button class="dss-pill ok" onclick="dssSetFilter('ok', this)">✅ Adequate</button>
+            <!-- Preventive Maintenance Section -->
+            <div class="admin-section" id="dss-pms">
+                <div class="dss-hero">
+                    <div class="dss-hero-left">
+                        <div class="dss-hero-icon">🔧</div>
+                        <div>
+                            <div class="dss-hero-title">Decision Support System</div>
+                            <div class="dss-hero-sub">Preventive Maintenance Scheduling Intelligence</div>
+                        </div>
+                    </div>
+                    <button class="dss-refresh-btn" onclick="renderDSSPMS()">🔄 Refresh Analysis</button>
+                </div>
+                <div class="dss-kpi-grid" id="dssPmsKpiGrid"></div>
+                <div class="dss-filter-bar">
+                    <div class="dss-filter-group">
+                        <label class="dss-filter-label">Filter by Status</label>
+                        <div class="dss-filter-pills" id="dssPmsFilterPills">
+                            <button class="dss-pill active" onclick="dssPMSSetFilter('all', this)">All</button>
+                            <button class="dss-pill critical" onclick="dssPMSSetFilter('overdue', this)">🔴 Overdue</button>
+                            <button class="dss-pill critical" onclick="dssPMSSetFilter('this-week', this)">🟠 Due This Week</button>
+                            <button class="dss-pill warning" onclick="dssPMSSetFilter('due-soon', this)">🟡 Due Soon</button>
+                            <button class="dss-pill ok" onclick="dssPMSSetFilter('on-track', this)">✅ On Track</button>
+                        </div>
+                    </div>
+                    <input type="text" class="dss-search" id="dssPmsSearch" placeholder="🔍 Search asset..." oninput="dssPMSApplySearch()">
+                </div>
+                <div class="dss-table-wrap">
+                    <div class="dss-table-header">
+                        <span>🔧 Maintenance Schedule Recommendations</span>
+                        <button class="dss-export-btn" onclick="dssPMSPrintReport()">🖨️ Print Report</button>
+                    </div>
+                    <div style="overflow-x:auto;">
+                        <table class="dss-table">
+                            <thead>
+                                <tr>
+                                    <th>Asset</th><th>Last Service</th><th>Next PMS Due</th>
+                                    <th>Days Until / Overdue</th><th>Odometer</th><th>Avg. Service Cost</th>
+                                    <th>Priority</th><th>Recommendation</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dssPmsTableBody"></tbody>
+                        </table>
                     </div>
                 </div>
-                <input type="text" class="dss-search" id="dssSearch" placeholder="🔍 Search item..." oninput="dssApplySearch()">
             </div>
 
-            <!-- Table -->
-            <div class="dss-table-wrap">
-                <div class="dss-table-header">
-                    <span>📋 Replenishment Recommendations</span>
-                    <button class="dss-export-btn" onclick="dssPrintReport()">🖨️ Print Report</button>
-                </div>
-                <div style="overflow-x:auto;">
-                    <table class="dss-table">
-                        <thead>
-                            <tr>
-                                <th>Item</th><th>Stock Status</th><th>Consumption Rate</th>
-                                <th>Days of Stock Left</th><th>Recommended Order</th><th>Priority</th><th>Decision</th>
-                            </tr>
-                        </thead>
-                        <tbody id="dssTableBody"></tbody>
-                    </table>
-                </div>
-            </div>
         </div>
     </div>
+    </div><!-- /.admin-dashboard-body -->
 </div>
 
 <div id="toast"></div>
 
 <script src="../static/js/data.js"></script>
-
-<!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -96,14 +146,37 @@
   }
 </script>
 <script src="../static/js/admin_firebase.js"></script>
-
 <script src="../static/js/admin_functions.js"></script>
 <script src="../static/js/admin.js"></script>
+<script src="../static/js/admin_sidebar.js"></script>
 <script>
-    fetch('admin_sidebar.html').then(r => r.text()).then(html => {
-        document.getElementById('sidebarContainer').innerHTML = html;
-        if (typeof renderDSS === 'function') renderDSS();
+  function switchDSSSection(section) {
+    document.body.setAttribute('data-page', section);
+    document.querySelectorAll('.admin-section').forEach(s => s.classList.remove('active'));
+    const target = document.getElementById(section);
+    if (target) target.classList.add('active');
+    const titleEl = document.getElementById('dssPageTitle');
+    if (titleEl) titleEl.textContent = section === 'dss-pms' ? 'Preventive Maintenance' : 'Stock Replenishment';
+    if (section === 'dss-pms') {
+      if (typeof renderDSSPMS === 'function') renderDSSPMS();
+    } else {
+      if (typeof renderDSS === 'function') renderDSS();
+    }
+    // Re-run sidebar active highlight
+    if (typeof initSidebarActive === 'function') initSidebarActive();
+  }
+
+  (function() {
+    const section = document.body.getAttribute('data-page') || 'dss';
+    switchDSSSection(section);
+
+    window.addEventListener('hashchange', function() {
+      const hash = window.location.hash.replace('#', '');
+      const newSection = (hash === 'dss-pms') ? 'dss-pms' : 'dss';
+      document.body.setAttribute('data-page', newSection);
+      switchDSSSection(newSection);
     });
+  })();
 </script>
 </body>
 </html>

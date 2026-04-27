@@ -5026,10 +5026,14 @@
             form.elements.sku.value = item.sku || '';
             form.elements.barcode.value = item.barcode || '';
             form.elements.qrcode.value = item.qrcode || '';
-            form.elements.commodityGroup.value = item.commodityGroup;
-            form.elements.uom.value = item.uom;
-            form.elements.cost.value = item.cost;
-            form.elements.itemType.value = item.itemType;
+            setTimeout(() => {
+                form.elements.commodityGroup.value = item.commodityGroup || '';
+                form.elements.uom.value = item.uom || '';
+                form.elements.itemType.value = item.itemType || '';
+                const isService = (item.commodityGroup || '').toLowerCase() === 'autoservice' || item.itemType === 'Service';
+                document.getElementById('imBarcodeQRRow').style.display = isService ? 'none' : '';
+            }, 50);
+            form.elements.cost.value = item.cost || '';
             document.getElementById('addItemMasterModal').classList.add('active');
         }
 
@@ -5037,8 +5041,14 @@
             const item = itemMaster.find(i => i.itemNum === itemNum);
             if (!item) return;
             if (confirm(`Delete ${item.itemName}? This cannot be undone.`)) {
-                itemMaster = itemMaster.filter(i => i.itemNum !== itemNum);
-                renderItemMasterList();
+                const docId = window._fbItemMaster?.find(i => i.num === itemNum)?._id;
+                if (docId) {
+                    db.collection('item_master').doc(docId).delete()
+                        .then(() => showToast('Item deleted.', 'success'))
+                        .catch(err => showToast('Delete failed: ' + err.message, 'error'));
+                } else {
+                    showToast('Item not found in database.', 'error');
+                }
             }
         }
 
@@ -5046,27 +5056,35 @@
             e.preventDefault();
             const form = e.target;
             const itemNum = form.elements.itemNum.value.trim();
-            const isDuplicate = itemMaster.some(i => i.itemNum === itemNum && i !== currentEditingItemMaster);
-            if (isDuplicate) { alert('Item Number already exists.'); return; }
             const data = {
-                itemNum,
-                itemName: form.elements.itemName.value.trim(),
-                description: form.elements.description.value.trim(),
-                sku: parseInt(form.elements.sku.value) || 0,
-                barcode: form.elements.barcode.value.trim(),
-                qrcode: form.elements.qrcode.value.trim(),
-                commodityGroup: form.elements.commodityGroup.value,
-                uom: form.elements.uom.value,
-                cost: parseFloat(form.elements.cost.value) || 0,
-                itemType: form.elements.itemType.value
+                num:            itemNum,
+                name:           form.elements.itemName.value.trim(),
+                desc:           form.elements.description.value.trim(),
+                sku:            form.elements.sku.value.trim(),
+                barcode:        form.elements.barcode.value.trim(),
+                qr:             form.elements.qrcode.value.trim(),
+                group:          form.elements.commodityGroup.value,
+                uom:            form.elements.uom.value,
+                cost:           parseFloat(form.elements.cost.value) || 0,
+                type:           form.elements.itemType.value,
             };
+
             if (currentEditingItemMaster) {
-                Object.assign(currentEditingItemMaster, data);
+                // Edit — find Firestore doc id
+                const docId = window._fbItemMaster?.find(i => i.num === itemNum)?._id;
+                if (!docId) { showToast('Item not found in database.', 'error'); return; }
+                db.collection('item_master').doc(docId).update(data)
+                    .then(() => { showToast('Item updated successfully!', 'success'); closeModal('addItemMasterModal'); })
+                    .catch(err => showToast('Update failed: ' + err.message, 'error'));
             } else {
-                itemMaster.push(data);
+                // Add — check duplicate then create
+                const isDuplicate = itemMaster.some(i => i.itemNum === itemNum);
+                if (isDuplicate) { alert('Item Number already exists.'); return; }
+                data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                db.collection('item_master').add(data)
+                    .then(() => { showToast('Item added successfully!', 'success'); closeModal('addItemMasterModal'); })
+                    .catch(err => showToast('Save failed: ' + err.message, 'error'));
             }
-            renderItemMasterList();
-            closeModal('addItemMasterModal');
         });
         // ─────────────────────────────────────────────────────────────
 

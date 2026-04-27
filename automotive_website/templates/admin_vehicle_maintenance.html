@@ -9,7 +9,9 @@
 </head>
 <body class="portal-body" data-page="asset-servicing">
 
-<div class="admin-dashboard" style="display:flex;">
+<div class="admin-dashboard" style="display:flex;flex-direction:column;">
+    <div id="headerContainer"></div>
+    <div class="admin-dashboard-body">
     <div id="sidebarContainer"></div>
 
     <div class="admin-main">
@@ -17,10 +19,6 @@
             <div>
                 <div class="breadcrumb">Admin Portal › Vehicle Maintenance Management</div>
                 <div class="admin-header-title">Vehicle Maintenance</div>
-            </div>
-            <div class="admin-header-actions">
-                <button class="btn-icon btn-secondary"><span>📊</span> Export</button>
-                <button class="btn-icon btn-primary" onclick="openAddServiceModal()"><span>➕</span> New Service</button>
             </div>
         </div>
 
@@ -33,13 +31,10 @@
             </div>
 
             <div class="data-table">
-                <div class="table-header">
-                    <span>Service Transactions</span>
-                    <div class="table-actions">
-                        <input type="text" class="search-bar" placeholder="Search services..." id="serviceSearch" oninput="renderServicesList()">
-                        <button class="btn-icon btn-secondary"><span>📊</span> Export</button>
-                        <button class="btn-icon btn-primary" onclick="openAddServiceModal()"><span>➕</span> New Service</button>
-                    </div>
+                <div class="table-actions" style="display:flex;justify-content:flex-end;gap:0.5rem;padding:0.75rem 1rem;border-bottom:1px solid #e2e8f0;">
+                    <input type="text" class="search-bar" placeholder="Search services..." id="serviceSearch">
+                    <button class="btn-icon btn-secondary"><span>📊</span> Export</button>
+                    <button class="btn-icon btn-primary" onclick="openAddServiceModal()"><span>➕</span> New Service</button>
                 </div>
                 <div class="table-row" style="background:#f7fafc;font-weight:bold;border-bottom:2px solid #e2e8f0;grid-template-columns:1fr 1fr 1.5fr 1fr 1fr 1fr 160px;">
                     <div>Date Serviced</div><div>Plate Number</div><div>Description</div>
@@ -49,6 +44,7 @@
             </div>
         </div>
     </div>
+    </div><!-- /.admin-dashboard-body -->
 </div>
 
 <div id="toast"></div>
@@ -75,10 +71,6 @@
 
 <script src="../static/js/admin_functions.js"></script>
 <script src="../static/js/admin.js"></script>
-<script>
-    fetch('admin_sidebar.html').then(r => r.text()).then(html => {
-        document.getElementById('sidebarContainer').innerHTML = html;
-    });
-</script>
+<script src="../static/js/admin_sidebar.js"></script>
 </body>
 </html>

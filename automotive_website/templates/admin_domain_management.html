@@ -9,7 +9,9 @@
 </head>
 <body class="portal-body" data-page="domains">
 
-<div class="admin-dashboard" style="display:flex;">
+<div class="admin-dashboard" style="display:flex;flex-direction:column;">
+    <div id="headerContainer"></div>
+    <div class="admin-dashboard-body">
     <div id="sidebarContainer"></div>
 
     <div class="admin-main">
@@ -17,9 +19,6 @@
             <div>
                 <div class="breadcrumb">Admin Portal</div>
                 <div class="admin-header-title">Domain Management</div>
-            </div>
-            <div class="admin-header-actions">
-                <button class="btn-icon btn-primary" onclick="openAddDomainModal()"><span>➕</span> Add Domain</button>
             </div>
         </div>
 
@@ -29,12 +28,9 @@
             </div>
 
             <div class="data-table">
-                <div class="table-header">
-                    <span>Domains</span>
-                    <div class="table-actions">
-                        <input type="text" class="search-bar" placeholder="Search domains..." id="domainSearch" oninput="renderDomainsList()">
-                        <button class="btn-icon btn-primary" onclick="openAddDomainModal()"><span>➕</span> Add Domain</button>
-                    </div>
+                <div class="table-actions" style="display:flex;justify-content:flex-end;gap:0.5rem;padding:0.75rem 1rem;border-bottom:1px solid #e2e8f0;">
+                    <input type="text" class="search-bar" placeholder="Search domains..." id="domainSearch">
+                    <button class="btn-icon btn-primary" onclick="openAddDomainModal()"><span>➕</span> Add Domain</button>
                 </div>
                 <div class="table-row" style="background:#f7fafc;font-weight:bold;border-bottom:2px solid #e2e8f0;grid-template-columns:40px 1.5fr 3fr 120px;">
                     <div>#</div><div>Domain Name</div><div>Values</div><div>Actions</div>
@@ -43,6 +39,7 @@
             </div>
         </div>
     </div>
+    </div><!-- /.admin-dashboard-body -->
 </div>
 
 <!-- Domain Modal -->
@@ -91,10 +88,6 @@
 
 <script src="../static/js/admin_functions.js"></script>
 <script src="../static/js/admin.js"></script>
-<script>
-    fetch('admin_sidebar.html').then(r => r.text()).then(html => {
-        document.getElementById('sidebarContainer').innerHTML = html;
-    });
-</script>
+<script src="../static/js/admin_sidebar.js"></script>
 </body>
 </html>

@@ -142,11 +142,11 @@ class _AdminInventoryStockState extends State<AdminInventoryStock> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
               child: Row(children: [
-                _statChip('Total Items', '$total', Colors.blue),
+                _statChip('Total Items', '$total', Colors.blue, Icons.inventory_2_outlined),
                 const SizedBox(width: 8),
-                _statChip('Low Stock', '$lowCount', _red),
+                _statChip('Low Stock', '$lowCount', _red, Icons.warning_amber_outlined),
                 const SizedBox(width: 8),
-                _statChip('In Stock', '${items.where((i) => i['status'] == 'OK').length}', Colors.green),
+                _statChip('In Stock', '${items.where((i) => i['status'] == 'OK').length}', Colors.green, Icons.check_circle_outline),
               ]),
             ),
             Expanded(
@@ -165,13 +165,19 @@ class _AdminInventoryStockState extends State<AdminInventoryStock> {
     );
   }
 
-  Widget _statChip(String label, String value, Color color) {
+  Widget _statChip(String label, String value, Color color, IconData icon) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)]),
         child: Column(children: [
+          Container(
+            width: 32, height: 32,
+            decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+            child: Icon(icon, color: color, size: 16),
+          ),
+          const SizedBox(height: 6),
           Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
           Text(label, style: const TextStyle(fontSize: 10, color: Color(0xFF718096))),
         ]),
@@ -254,6 +260,7 @@ class _AdminInventoryStockState extends State<AdminInventoryStock> {
   void _showActionChoice() {
     showModalBottomSheet(
       context: context,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => Padding(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
@@ -310,6 +317,7 @@ class _AdminInventoryStockState extends State<AdminInventoryStock> {
   void _showStockDetails(Map<String, dynamic> item) {
     showModalBottomSheet(
       context: context, isScrollControlled: true,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => DraggableScrollableSheet(
         expand: false, initialChildSize: 0.55, maxChildSize: 0.85,
@@ -377,6 +385,7 @@ class _AdminInventoryStockState extends State<AdminInventoryStock> {
 
     showModalBottomSheet(
       context: context, isScrollControlled: true,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => StatefulBuilder(
         builder: (ctx, setModal) => DraggableScrollableSheet(
@@ -573,6 +582,7 @@ class _AdminInventoryStockState extends State<AdminInventoryStock> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.white,
       isDismissible: true,
       enableDrag: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
@@ -684,6 +694,7 @@ class _AdminInventoryStockState extends State<AdminInventoryStock> {
 
     showModalBottomSheet(
       context: context, isScrollControlled: true,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => StatefulBuilder(
         builder: (ctx, setModal) => DraggableScrollableSheet(

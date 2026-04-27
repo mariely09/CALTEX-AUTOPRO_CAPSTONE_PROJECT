@@ -107,16 +107,16 @@ class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
             final data = d.data() as Map<String, dynamic>;
             return {
               'id': d.id,
-              'num': data['num'] as String? ?? '—',
-              'sku': data['sku'] as String? ?? '',
-              'name': data['name'] as String? ?? '—',
-              'desc': data['desc'] as String? ?? '',
-              'group': data['group'] as String? ?? '',
-              'uom': data['uom'] as String? ?? '',
-              'cost': data['cost'] as String? ?? '₱0',
-              'type': data['type'] as String? ?? 'Material',
-              'barcode': data['barcode'] as String? ?? '',
-              'qr': data['qr'] as String? ?? '',
+              'num': (data['num'] ?? '—').toString(),
+              'sku': (data['sku'] ?? '').toString(),
+              'name': (data['name'] ?? '—').toString(),
+              'desc': (data['desc'] ?? '').toString(),
+              'group': (data['group'] ?? '').toString(),
+              'uom': (data['uom'] ?? '').toString(),
+              'cost': (data['cost'] ?? '₱0').toString(),
+              'type': (data['type'] ?? 'Material').toString(),
+              'barcode': (data['barcode'] ?? '').toString(),
+              'qr': (data['qr'] ?? '').toString(),
             };
           }).toList();
 
@@ -135,11 +135,11 @@ class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
               child: Row(children: [
-                _statChip('Total Items', '$total', Colors.blue),
+                _statChip('Total Items', '$total', Colors.blue, Icons.list_alt_outlined),
                 const SizedBox(width: 8),
-                _statChip('Materials', '$materials', _red),
+                _statChip('Materials', '$materials', _red, Icons.inventory_2_outlined),
                 const SizedBox(width: 8),
-                _statChip('Services', '$services', const Color(0xFF003087)),
+                _statChip('Services', '$services', const Color(0xFF003087), Icons.build_outlined),
               ]),
             ),
             Expanded(
@@ -158,13 +158,19 @@ class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
     );
   }
 
-  Widget _statChip(String label, String value, Color color) {
+  Widget _statChip(String label, String value, Color color, IconData icon) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)]),
         child: Column(children: [
+          Container(
+            width: 32, height: 32,
+            decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+            child: Icon(icon, color: color, size: 16),
+          ),
+          const SizedBox(height: 6),
           Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
           Text(label, style: const TextStyle(fontSize: 10, color: Color(0xFF718096))),
         ]),
@@ -222,6 +228,7 @@ class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
     final isSvc = item['type'] == 'Service';
     showModalBottomSheet(
       context: context, isScrollControlled: true,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => DraggableScrollableSheet(
         expand: false, initialChildSize: 0.6, maxChildSize: 0.9,
@@ -347,6 +354,7 @@ class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
 
     showModalBottomSheet(
       context: context, isScrollControlled: true,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => StatefulBuilder(
         builder: (ctx, setModalState) => Padding(

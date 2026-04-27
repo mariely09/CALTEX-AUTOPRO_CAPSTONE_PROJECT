@@ -9,7 +9,9 @@
 </head>
 <body class="portal-body" data-page="inventory">
 
-<div class="admin-dashboard" style="display:flex;">
+<div class="admin-dashboard" style="display:flex;flex-direction:column;">
+    <div id="headerContainer"></div>
+    <div class="admin-dashboard-body">
     <div id="sidebarContainer"></div>
 
     <div class="admin-main">
@@ -18,29 +20,37 @@
                 <div class="breadcrumb">Admin Portal › Inventory Management</div>
                 <div class="admin-header-title">Stock Inventory</div>
             </div>
-            <div class="admin-header-actions">
-                <button class="btn-icon btn-success" onclick="openStaffReceiveDeliveryModal()"><span>📥</span> Receive Items</button>
-                <button class="btn-icon btn-primary" onclick="openAddInventoryModal()"><span>➕</span> Add New Item</button>
+            <div style="margin-left:auto;">
+                <input type="text" class="search-bar" placeholder="🔍 Search parts..." id="inventorySearch" style="width:220px;" oninput="renderInventoryList()">
             </div>
         </div>
 
         <div class="admin-content">
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.5rem;">
-                <div class="stat-card"><div class="stat-icon blue">📦</div><div class="stat-number" id="totalInventoryItems">0</div><div class="stat-label">Total Items</div></div>
-                <div class="stat-card"><div class="stat-icon red">⚠️</div><div class="stat-number" id="lowStockCount">0</div><div class="stat-label">Low Stock Items</div></div>
-                <div class="stat-card"><div class="stat-icon green">💰</div><div class="stat-number" id="totalInventoryValue">₱0</div><div class="stat-label">Total Value</div></div>
+                <div class="stat-card">
+                    <div class="stat-icon blue">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14a2 2 0 0 1 2 2v3H3V6a2 2 0 0 1 2-2z"/><path d="M3 9h18v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9z"/><path d="M10 13h4"/></svg>
+                    </div>
+                    <div class="stat-number" id="totalInventoryItems">0</div>
+                    <div class="stat-label">Total Items</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon red">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    </div>
+                    <div class="stat-number" id="lowStockCount">0</div>
+                    <div class="stat-label">Low Stock Items</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon green">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    </div>
+                    <div class="stat-number" id="totalInventoryValue">₱0</div>
+                    <div class="stat-label">Total Value</div>
+                </div>
             </div>
 
             <div class="data-table">
-                <div class="table-header">
-                    <span>Parts Inventory</span>
-                    <div class="table-actions">
-                        <input type="text" class="search-bar" placeholder="Search parts..." id="inventorySearch" oninput="renderInventoryList()">
-                        <button class="btn-icon btn-secondary" onclick="openInventoryListScanModal()"><span>📷</span> Scan</button>
-                        <button class="btn-icon btn-success" onclick="openStaffReceiveDeliveryModal()"><span>📥</span> Receive Items</button>
-                        <button class="btn-icon btn-primary" onclick="openAddInventoryModal()"><span>➕</span> Add New Item</button>
-                    </div>
-                </div>
                 <div class="table-row" style="background:#f7fafc;font-weight:bold;border-bottom:2px solid #e2e8f0;grid-template-columns:100px 1.5fr 1fr 100px 90px 90px 90px 110px 110px;">
                     <div>Item No.</div><div>Item Name</div><div>Commodity Group</div><div>Current Qty</div>
                     <div>Min Level</div><div>Max Level</div><div>Reorder Qty</div><div>Status</div><div>Actions</div>
@@ -49,9 +59,118 @@
             </div>
         </div>
     </div>
+    </div><!-- /.admin-dashboard-body -->
 </div>
 
 <div id="toast"></div>
+
+<!-- ── View Stock Item Modal ── -->
+<div class="modal" id="inventoryDetailsModal">
+    <div class="modal-content" style="max-width:520px;padding:0;border-radius:20px;overflow:hidden;display:flex;flex-direction:column;max-height:90vh;">
+        <div id="invDetailHeader" style="background:linear-gradient(135deg,#E31E24,#C41E3A);padding:1.25rem 1.5rem;position:relative;flex-shrink:0;">
+            <button onclick="closeModal('inventoryDetailsModal')" style="position:absolute;top:0.85rem;right:0.85rem;background:rgba(255,255,255,0.2);border:none;color:white;width:30px;height:30px;border-radius:50%;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;">&times;</button>
+            <div style="display:flex;align-items:center;gap:0.85rem;">
+                <div style="background:rgba(255,255,255,0.2);width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14a2 2 0 0 1 2 2v3H3V6a2 2 0 0 1 2-2z"/><path d="M3 9h18v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9z"/><path d="M10 13h4"/></svg>
+                </div>
+                <div>
+                    <div id="invDetailName" style="font-size:1.05rem;font-weight:800;color:white;line-height:1.3;"></div>
+                    <div id="invDetailGroup" style="font-size:0.78rem;color:rgba(255,255,255,0.75);margin-top:0.2rem;"></div>
+                </div>
+            </div>
+        </div>
+        <div style="padding:1.25rem 1.5rem;overflow-y:auto;flex:1;background:#f8fafc;">
+            <div id="invDetailBody"></div>
+        </div>
+        <div style="padding:1rem 1.5rem;background:white;border-top:1px solid #e2e8f0;flex-shrink:0;">
+            <button id="invDetailEditBtn" style="width:100%;padding:0.8rem;background:linear-gradient(135deg,#E31E24,#C41E3A);border:none;border-radius:10px;color:white;font-weight:700;cursor:pointer;font-size:0.95rem;">✏️ Edit</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Edit Stock Item Modal ── -->
+<div class="modal" id="editInventoryModal">
+    <div class="modal-content" style="max-width:480px;padding:0;border-radius:20px;overflow:hidden;display:flex;flex-direction:column;max-height:90vh;">
+        <div style="background:linear-gradient(135deg,#E31E24,#C41E3A);padding:1.25rem 1.5rem;display:flex;align-items:center;gap:0.85rem;flex-shrink:0;">
+            <div style="background:rgba(255,255,255,0.2);width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </div>
+            <div style="flex:1;">
+                <div style="color:white;font-size:1rem;font-weight:700;">Edit Stock Item</div>
+                <div id="editInvItemLabel" style="color:rgba(255,255,255,0.75);font-size:0.78rem;margin-top:0.1rem;"></div>
+            </div>
+            <button onclick="closeModal('editInventoryModal')" style="background:rgba(255,255,255,0.2);border:none;color:white;width:32px;height:32px;border-radius:50%;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;">&times;</button>
+        </div>
+        <div style="padding:1.25rem 1.5rem;overflow-y:auto;flex:1;background:#f8fafc;display:flex;flex-direction:column;gap:0.85rem;">
+            <div style="background:white;border-radius:12px;padding:1rem 1.25rem;border:1px solid #e2e8f0;font-size:0.83rem;color:#4a5568;" id="editInvInfoBox"></div>
+            <div style="font-size:0.85rem;font-weight:700;color:#1a202c;">Stock Level Settings</div>
+            <div class="form-group" style="margin:0;">
+                <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Current Quantity *</label>
+                <input type="number" id="editInvStock" min="0" style="margin-top:0.3rem;">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+                <div class="form-group" style="margin:0;">
+                    <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Min Level *</label>
+                    <input type="number" id="editInvMin" min="0" style="margin-top:0.3rem;">
+                </div>
+                <div class="form-group" style="margin:0;">
+                    <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Max Level *</label>
+                    <input type="number" id="editInvMax" min="0" style="margin-top:0.3rem;">
+                </div>
+            </div>
+            <div class="form-group" style="margin:0;">
+                <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Reorder Quantity *</label>
+                <input type="number" id="editInvReorder" min="0" style="margin-top:0.3rem;">
+            </div>
+        </div>
+        <div style="padding:1rem 1.5rem;background:white;border-top:1px solid #e2e8f0;display:flex;gap:0.75rem;flex-shrink:0;">
+            <button type="button" class="btn-secondary" style="flex:1;" onclick="closeModal('editInventoryModal')">Cancel</button>
+            <button type="button" class="btn-primary" style="flex:1;" onclick="stockSaveEdit()">💾 Update</button>
+        </div>
+    </div>
+</div>
+
+<!-- Floating Action Button -->
+<button onclick="openStockActionModal()" style="position:fixed;bottom:2rem;right:2rem;width:56px;height:56px;border-radius:50%;background:#E31E24;border:none;color:white;cursor:pointer;box-shadow:0 4px 16px rgba(227,30,36,0.4);display:flex;align-items:center;justify-content:center;z-index:9999;transition:transform 0.2s,box-shadow 0.2s;" onmouseover="this.style.transform='scale(1.1)';this.style.boxShadow='0 6px 24px rgba(227,30,36,0.5)'" onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 4px 16px rgba(227,30,36,0.4)'">
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+</button>
+
+<!-- Stock Action Choice Modal -->
+<div class="modal" id="stockActionModal">
+    <div class="modal-content" style="max-width:420px;padding:0;border-radius:20px;overflow:hidden;">
+        <div style="background:linear-gradient(135deg,#E31E24,#C41E3A);padding:1.25rem 1.5rem;display:flex;align-items:center;justify-content:space-between;">
+            <div>
+                <div style="color:white;font-size:1rem;font-weight:700;">What would you like to do?</div>
+                <div style="color:rgba(255,255,255,0.75);font-size:0.8rem;margin-top:0.2rem;">Choose an action below</div>
+            </div>
+            <button onclick="closeModal('stockActionModal')" style="background:rgba(255,255,255,0.2);border:none;color:white;width:30px;height:30px;border-radius:50%;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;">&times;</button>
+        </div>
+        <div style="padding:1.25rem;background:#f8fafc;display:flex;flex-direction:column;gap:0.75rem;">
+            <!-- Receive Items -->
+            <div onclick="closeModal('stockActionModal');openStaffReceiveDeliveryModal();" style="background:white;border:1.5px solid #90cdf4;border-radius:14px;padding:1rem 1.25rem;display:flex;align-items:center;gap:1rem;cursor:pointer;transition:box-shadow 0.15s;" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,48,135,0.1)'" onmouseout="this.style.boxShadow='none'">
+                <div style="width:48px;height:48px;background:#003087;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                </div>
+                <div style="flex:1;">
+                    <div style="font-weight:700;font-size:0.92rem;color:#1a202c;">Receive Items</div>
+                    <div style="font-size:0.78rem;color:#718096;margin-top:0.15rem;">Update stock from delivery</div>
+                </div>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#718096" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+            <!-- Add Stock Item -->
+            <div onclick="closeModal('stockActionModal');openAddInventoryModal();" style="background:white;border:1.5px solid #bee3f8;border-radius:14px;padding:1rem 1.25rem;display:flex;align-items:center;gap:1rem;cursor:pointer;transition:box-shadow 0.15s;" onmouseover="this.style.boxShadow='0 4px 12px rgba(227,30,36,0.1)'" onmouseout="this.style.boxShadow='none'">
+                <div style="width:48px;height:48px;background:#E31E24;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14a2 2 0 0 1 2 2v3H3V6a2 2 0 0 1 2-2z"/><path d="M3 9h18v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9z"/><path d="M10 13h4"/></svg>
+                </div>
+                <div style="flex:1;">
+                    <div style="font-weight:700;font-size:0.92rem;color:#1a202c;">Add Stock Item</div>
+                    <div style="font-size:0.78rem;color:#718096;margin-top:0.15rem;">Add a new item to inventory</div>
+                </div>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#718096" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+        </div>
+    </div>
+</div>
 
 <script src="../static/js/data.js"></script>
 
@@ -75,10 +194,380 @@
 
 <script src="../static/js/admin_functions.js"></script>
 <script src="../static/js/admin.js"></script>
+<script src="../static/js/admin_sidebar.js"></script>
+
+<!-- ── Receive Items Modal ── -->
+<div class="modal" id="staffReceiveDeliveryModal">
+    <div class="modal-content" style="max-width:520px;padding:0;border-radius:20px;overflow:hidden;display:flex;flex-direction:column;max-height:90vh;">
+        <div style="background:linear-gradient(135deg,#003087,#00205b);padding:1.25rem 1.5rem;display:flex;align-items:center;gap:0.85rem;flex-shrink:0;">
+            <div style="background:rgba(255,255,255,0.2);width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </div>
+            <div style="flex:1;">
+                <div style="color:white;font-size:1rem;font-weight:700;">Receive Items</div>
+                <div style="color:rgba(255,255,255,0.75);font-size:0.78rem;margin-top:0.1rem;">Scan or search item to receive stock</div>
+            </div>
+            <button onclick="closeModal('staffReceiveDeliveryModal')" style="background:rgba(255,255,255,0.2);border:none;color:white;width:32px;height:32px;border-radius:50%;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;">&times;</button>
+        </div>
+        <div style="padding:1.25rem 1.5rem;overflow-y:auto;flex:1;background:#f8fafc;display:flex;flex-direction:column;gap:0.85rem;">
+            <div style="display:flex;gap:0.5rem;">
+                <input type="text" id="deliveryItemSearch" placeholder="Barcode, QR, item number or name..." style="flex:1;border:1.5px solid #e2e8f0;border-radius:10px;padding:0.65rem 0.9rem;font-size:0.88rem;outline:none;" oninput="stockSearchReceiveItem(this.value)">
+                <button onclick="stockSearchReceiveItem(document.getElementById('deliveryItemSearch').value)" style="background:#003087;border:none;color:white;padding:0 1rem;border-radius:10px;cursor:pointer;font-size:0.85rem;font-weight:600;">Search</button>
+            </div>
+            <div id="deliveryItemInfo" style="display:none;background:white;border:1.5px solid #90cdf4;border-radius:12px;padding:1rem 1.25rem;">
+                <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem;">
+                    <div style="width:44px;height:44px;background:#003087;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14a2 2 0 0 1 2 2v3H3V6a2 2 0 0 1 2-2z"/><path d="M3 9h18v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9z"/><path d="M10 13h4"/></svg>
+                    </div>
+                    <div>
+                        <div id="deliveryItemName" style="font-weight:700;font-size:0.92rem;color:#1a202c;"></div>
+                        <div id="deliveryItemMeta" style="font-size:0.78rem;color:#718096;margin-top:0.1rem;"></div>
+                        <div id="deliveryCurrentStock" style="font-size:0.78rem;color:#2c5282;font-weight:600;margin-top:0.1rem;"></div>
+                    </div>
+                </div>
+                <div class="form-group" style="margin:0;">
+                    <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Quantity Received *</label>
+                    <input type="number" id="deliveryQty" min="1" placeholder="e.g. 10" style="margin-top:0.3rem;width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:0.6rem 0.8rem;font-size:0.9rem;outline:none;box-sizing:border-box;">
+                </div>
+            </div>
+            <div id="deliveryNotFound" style="display:none;background:#fff5f5;border:1px solid #fed7d7;border-radius:10px;padding:0.75rem 1rem;font-size:0.83rem;color:#c53030;">No stock item found for that code.</div>
+        </div>
+        <div style="padding:1rem 1.5rem;background:white;border-top:1px solid #e2e8f0;display:flex;gap:0.75rem;flex-shrink:0;">
+            <button type="button" class="btn-secondary" style="flex:1;" onclick="closeModal('staffReceiveDeliveryModal')">Cancel</button>
+            <button type="button" class="btn-primary" style="flex:1;background:#003087;" onclick="stockConfirmReceive()">✅ Confirm</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Add Stock Item Modal ── -->
+<div class="modal" id="addInventoryModal">
+    <div class="modal-content" style="max-width:520px;padding:0;border-radius:20px;overflow:hidden;display:flex;flex-direction:column;max-height:90vh;">
+        <div style="background:linear-gradient(135deg,#E31E24,#C41E3A);padding:1.25rem 1.5rem;display:flex;align-items:center;gap:0.85rem;flex-shrink:0;">
+            <div style="background:rgba(255,255,255,0.2);width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14a2 2 0 0 1 2 2v3H3V6a2 2 0 0 1 2-2z"/><path d="M3 9h18v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9z"/><path d="M10 13h4"/></svg>
+            </div>
+            <div style="flex:1;">
+                <div style="color:white;font-size:1rem;font-weight:700;">Add Stock Item</div>
+                <div style="color:rgba(255,255,255,0.75);font-size:0.78rem;margin-top:0.1rem;">Search item from Item Master</div>
+            </div>
+            <button onclick="closeModal('addInventoryModal')" style="background:rgba(255,255,255,0.2);border:none;color:white;width:32px;height:32px;border-radius:50%;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;">&times;</button>
+        </div>
+        <div style="padding:1.25rem 1.5rem;overflow-y:auto;flex:1;background:#f8fafc;display:flex;flex-direction:column;gap:0.85rem;">
+            <div style="display:flex;gap:0.5rem;">
+                <input type="text" id="invItemSearch" placeholder="Scan or search item..." style="flex:1;border:1.5px solid #e2e8f0;border-radius:10px;padding:0.65rem 0.9rem;font-size:0.88rem;outline:none;" oninput="stockSearchMasterItem(this.value)">
+                <button onclick="stockSearchMasterItem(document.getElementById('invItemSearch').value)" style="background:#E31E24;border:none;color:white;padding:0 1rem;border-radius:10px;cursor:pointer;font-size:0.85rem;font-weight:600;">Search</button>
+            </div>
+            <!-- Found item preview -->
+            <div id="invItemPreview" style="display:none;background:white;border:1.5px solid #9ae6b4;border-radius:12px;padding:1rem 1.25rem;">
+                <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    <span style="font-size:0.75rem;font-weight:700;color:#16a34a;">Item Found</span>
+                </div>
+                <div id="invPreviewInfo" style="font-size:0.83rem;color:#4a5568;"></div>
+            </div>
+            <div id="invAlreadyExists" style="display:none;background:#fffbeb;border:1px solid #fcd34d;border-radius:10px;padding:0.75rem 1rem;font-size:0.83rem;color:#92400e;">⚠️ This item already exists in stock inventory. Use Edit to update it.</div>
+            <div id="invNotFound" style="display:none;background:#fff5f5;border:1px solid #fed7d7;border-radius:10px;padding:0.75rem 1rem;font-size:0.83rem;color:#c53030;">No item found in Item Master.</div>
+            <!-- Stock level fields — shown after item found -->
+            <div id="invStockFields" style="display:none;display:flex;flex-direction:column;gap:0.75rem;">
+                <div style="font-size:0.85rem;font-weight:700;color:#1a202c;">Stock Level Settings</div>
+                <div class="form-group" style="margin:0;">
+                    <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Current Quantity *</label>
+                    <input type="number" id="invStockQty" min="0" placeholder="e.g. 50" style="margin-top:0.3rem;">
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+                    <div class="form-group" style="margin:0;">
+                        <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Min Level *</label>
+                        <input type="number" id="invStockMin" min="0" placeholder="e.g. 10" style="margin-top:0.3rem;">
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Max Level *</label>
+                        <input type="number" id="invStockMax" min="0" placeholder="e.g. 100" style="margin-top:0.3rem;">
+                    </div>
+                </div>
+                <div class="form-group" style="margin:0;">
+                    <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Reorder Quantity *</label>
+                    <input type="number" id="invStockReorder" min="0" placeholder="e.g. 20" style="margin-top:0.3rem;">
+                </div>
+            </div>
+        </div>
+        <div style="padding:1rem 1.5rem;background:white;border-top:1px solid #e2e8f0;display:flex;gap:0.75rem;flex-shrink:0;">
+            <button type="button" class="btn-secondary" style="flex:1;" onclick="closeModal('addInventoryModal')">Cancel</button>
+            <button type="button" class="btn-primary" style="flex:1;" id="invSaveBtn" onclick="stockSaveNewItem()">💾 Save</button>
+        </div>
+    </div>
+</div>
+
 <script>
-    fetch('admin_sidebar.html').then(r => r.text()).then(html => {
-        document.getElementById('sidebarContainer').innerHTML = html;
+function openStockActionModal() {
+    document.getElementById('stockActionModal').classList.add('active');
+}
+
+// ── Shared state ──
+var _receiveFoundItem = null;
+var _addFoundMaster = null;
+
+// ── Receive Items ──
+function openStaffReceiveDeliveryModal() {
+    _receiveFoundItem = null;
+    document.getElementById('deliveryItemSearch').value = '';
+    document.getElementById('deliveryItemInfo').style.display = 'none';
+    document.getElementById('deliveryNotFound').style.display = 'none';
+    document.getElementById('deliveryQty').value = '';
+    document.getElementById('staffReceiveDeliveryModal').classList.add('active');
+}
+
+function stockSearchReceiveItem(query) {
+    if (!query || query.trim().length < 2) return;
+    var q = query.trim().toLowerCase();
+    var inv = window.inventory || [];
+    var found = inv.find(function(i) {
+        return (i.itemNum||'').toLowerCase() === q
+            || (i.itemName||'').toLowerCase().includes(q)
+            || (i.barcode||'').toLowerCase() === q
+            || (i.qrcode||'').toLowerCase() === q;
     });
+    var infoEl = document.getElementById('deliveryItemInfo');
+    var notFoundEl = document.getElementById('deliveryNotFound');
+    if (found) {
+        _receiveFoundItem = found;
+        document.getElementById('deliveryItemName').textContent = found.itemName || found.name || '—';
+        document.getElementById('deliveryItemMeta').textContent = (found.itemNum||'') + ' • ' + (found.commodityGroup||found.group||'');
+        document.getElementById('deliveryCurrentStock').textContent = 'Current stock: ' + (found.stock||0) + ' ' + (found.uom||found.unit||'');
+        document.getElementById('deliveryQty').value = '';
+        infoEl.style.display = 'block';
+        notFoundEl.style.display = 'none';
+    } else {
+        _receiveFoundItem = null;
+        infoEl.style.display = 'none';
+        notFoundEl.style.display = 'block';
+    }
+}
+
+function stockConfirmReceive() {
+    if (!_receiveFoundItem) { showToast('Please search and select an item first.', 'error'); return; }
+    var qty = parseInt(document.getElementById('deliveryQty').value) || 0;
+    if (qty <= 0) { showToast('Please enter a valid quantity.', 'error'); return; }
+
+    var db = firebase.firestore();
+    // Find the stock_inventory doc by num
+    var num = _receiveFoundItem.itemNum || _receiveFoundItem.num;
+    db.collection('stock_inventory').where('num', '==', num).limit(1).get().then(function(snap) {
+        if (snap.empty) { showToast('Item not found in stock inventory.', 'error'); return; }
+        var doc = snap.docs[0];
+        var currentStock = (doc.data().stock || 0);
+        var min = (doc.data().min || 0);
+        var newStock = currentStock + qty;
+        return doc.ref.update({
+            stock: newStock,
+            status: newStock >= min ? 'OK' : 'Low',
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    }).then(function() {
+        closeModal('staffReceiveDeliveryModal');
+        showToast('Stock received successfully!', 'success');
+    }).catch(function(err) {
+        showToast('Error: ' + err.message, 'error');
+    });
+}
+
+// ── Add Stock Item ──
+function openAddInventoryModal() {
+    _addFoundMaster = null;
+    document.getElementById('invItemSearch').value = '';
+    document.getElementById('invItemPreview').style.display = 'none';
+    document.getElementById('invAlreadyExists').style.display = 'none';
+    document.getElementById('invNotFound').style.display = 'none';
+    document.getElementById('invStockFields').style.display = 'none';
+    ['invStockQty','invStockMin','invStockMax','invStockReorder'].forEach(function(id) {
+        document.getElementById(id).value = '';
+    });
+    document.getElementById('addInventoryModal').classList.add('active');
+}
+
+function stockSearchMasterItem(query) {
+    if (!query || query.trim().length < 2) return;
+    var q = query.trim().toLowerCase();
+    var master = window.itemMaster || [];
+    var found = master.find(function(i) {
+        return (i.itemNum||'').toLowerCase() === q
+            || (i.itemName||'').toLowerCase().includes(q)
+            || (i.barcode||'').toLowerCase() === q
+            || (i.qrcode||'').toLowerCase() === q;
+    });
+
+    var previewEl = document.getElementById('invItemPreview');
+    var alreadyEl = document.getElementById('invAlreadyExists');
+    var notFoundEl = document.getElementById('invNotFound');
+    var fieldsEl = document.getElementById('invStockFields');
+
+    if (!found) {
+        _addFoundMaster = null;
+        previewEl.style.display = 'none';
+        alreadyEl.style.display = 'none';
+        notFoundEl.style.display = 'block';
+        fieldsEl.style.display = 'none';
+        return;
+    }
+
+    notFoundEl.style.display = 'none';
+    // Check if already in stock
+    var inv = window.inventory || [];
+    var exists = inv.some(function(i) { return (i.itemNum||'').toLowerCase() === (found.itemNum||'').toLowerCase(); });
+    if (exists) {
+        _addFoundMaster = null;
+        previewEl.style.display = 'none';
+        alreadyEl.style.display = 'block';
+        fieldsEl.style.display = 'none';
+        return;
+    }
+
+    _addFoundMaster = found;
+    alreadyEl.style.display = 'none';
+    document.getElementById('invPreviewInfo').innerHTML =
+        '<div style="display:grid;grid-template-columns:110px 1fr;gap:0.3rem 0;">'
+        + '<span style="color:#718096;font-size:0.78rem;">Item Number</span><span style="font-weight:600;font-size:0.83rem;">' + (found.itemNum||'—') + '</span>'
+        + '<span style="color:#718096;font-size:0.78rem;">Item Name</span><span style="font-weight:600;font-size:0.83rem;">' + (found.itemName||'—') + '</span>'
+        + '<span style="color:#718096;font-size:0.78rem;">Group</span><span style="font-weight:600;font-size:0.83rem;">' + (found.commodityGroup||'—') + '</span>'
+        + '<span style="color:#718096;font-size:0.78rem;">UOM</span><span style="font-weight:600;font-size:0.83rem;">' + (found.uom||'—') + '</span>'
+        + '</div>';
+    previewEl.style.display = 'block';
+    fieldsEl.style.display = 'flex';
+}
+
+function stockSaveNewItem() {
+    if (!_addFoundMaster) { showToast('Please search and select an item first.', 'error'); return; }
+    var stock = parseInt(document.getElementById('invStockQty').value) || 0;
+    var min = parseInt(document.getElementById('invStockMin').value) || 0;
+    var max = parseInt(document.getElementById('invStockMax').value) || 0;
+    var reorder = parseInt(document.getElementById('invStockReorder').value) || 0;
+
+    var db = firebase.firestore();
+    var data = {
+        num: _addFoundMaster.itemNum || '',
+        name: _addFoundMaster.itemName || '',
+        group: _addFoundMaster.commodityGroup || '',
+        uom: _addFoundMaster.uom || '',
+        stock: stock, min: min, max: max, reorder: reorder,
+        status: stock >= min ? 'OK' : 'Low',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    // Double-check not already existing
+    db.collection('stock_inventory').where('num', '==', data.num).limit(1).get().then(function(snap) {
+        if (!snap.empty) { showToast('Already in stock inventory.', 'error'); return; }
+        return db.collection('stock_inventory').add(data);
+    }).then(function() {
+        closeModal('addInventoryModal');
+        showToast('Stock item added successfully!', 'success');
+    }).catch(function(err) {
+        showToast('Error: ' + err.message, 'error');
+    });
+}
+
+// ── View / Edit / Delete ──
+var _editingInvDocId = null;
+
+function viewInventoryItem(id) {
+    var inv = window.inventory || [];
+    var item = inv.find(function(i){ return i.id === id; });
+    if (!item) return;
+
+    var isLow = item.stock <= item.minLevel;
+    var isOut = item.stock === 0;
+    var isOver = item.maxLevel > 0 && item.stock > item.maxLevel;
+    var statusLabel = isOut ? 'Out of Stock' : isLow ? 'Low Stock' : isOver ? 'Over Max' : 'In Stock';
+    var barColor = isOut ? '#e53e3e' : isLow ? '#d69e2e' : isOver ? '#805ad5' : '#38a169';
+    var stockPct = item.maxLevel > 0 ? Math.min(100, Math.round((item.stock / item.maxLevel) * 100)) : 0;
+
+    document.getElementById('invDetailName').textContent = item.itemName;
+    document.getElementById('invDetailGroup').textContent = item.commodityGroup || '—';
+
+    document.getElementById('invDetailBody').innerHTML =
+        '<div style="background:white;border-radius:12px;padding:1rem 1.25rem;border:1px solid #e2e8f0;margin-bottom:0.75rem;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.5rem;">'
+        +   '<span style="font-size:0.72rem;font-weight:700;color:#718096;text-transform:uppercase;">Stock Level</span>'
+        +   '<span style="font-size:1.4rem;font-weight:900;color:' + barColor + ';">' + item.stock + ' <span style="font-size:0.8rem;font-weight:600;color:#718096;">' + (item.unit||'') + '</span></span>'
+        + '</div>'
+        + '<div style="width:100%;height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden;margin-bottom:0.4rem;">'
+        +   '<div style="height:100%;width:' + stockPct + '%;background:' + barColor + ';border-radius:4px;"></div>'
+        + '</div>'
+        + '<div style="display:flex;justify-content:space-between;font-size:0.7rem;color:#a0aec0;font-weight:600;">'
+        +   '<span>0</span><span>Min: ' + item.minLevel + '</span><span>Max: ' + item.maxLevel + '</span>'
+        + '</div>'
+        + '</div>'
+        + '<div style="background:white;border-radius:12px;padding:1rem 1.25rem;border:1px solid #e2e8f0;">'
+        + _invRow('Item Number', item.itemNum)
+        + _invRow('Item Name', item.itemName)
+        + _invRow('Commodity Group', item.commodityGroup || '—')
+        + _invRow('UOM', item.unit || '—')
+        + _invRow('Current Stock', item.stock + ' ' + (item.unit||''))
+        + _invRow('Min Level', item.minLevel + ' ' + (item.unit||''))
+        + _invRow('Max Level', item.maxLevel + ' ' + (item.unit||''))
+        + _invRow('Reorder Qty', (item.reorderQty||0) + ' ' + (item.unit||''))
+        + _invRow('Status', '<span style="font-weight:700;color:' + barColor + ';">' + statusLabel + '</span>')
+        + '</div>';
+
+    document.getElementById('invDetailEditBtn').onclick = function() {
+        closeModal('inventoryDetailsModal');
+        editInventoryItem(id);
+    };
+    document.getElementById('inventoryDetailsModal').classList.add('active');
+}
+
+function _invRow(label, value) {
+    return '<div style="display:flex;padding:0.5rem 0;border-bottom:1px solid #f7fafc;">'
+        + '<span style="width:130px;flex-shrink:0;font-size:0.78rem;color:#718096;font-weight:500;">' + label + '</span>'
+        + '<span style="font-size:0.85rem;font-weight:600;color:#1a202c;flex:1;">' + value + '</span>'
+        + '</div>';
+}
+
+function editInventoryItem(id) {
+    var inv = window.inventory || [];
+    var item = inv.find(function(i){ return i.id === id; });
+    if (!item) return;
+    _editingInvDocId = id;
+    document.getElementById('editInvItemLabel').textContent = item.itemNum + ' · ' + item.itemName;
+    document.getElementById('editInvInfoBox').innerHTML =
+        '<div style="display:grid;grid-template-columns:110px 1fr;gap:0.25rem 0;font-size:0.82rem;">'
+        + '<span style="color:#718096;">Item Number</span><span style="font-weight:600;">' + item.itemNum + '</span>'
+        + '<span style="color:#718096;">Item Name</span><span style="font-weight:600;">' + item.itemName + '</span>'
+        + '<span style="color:#718096;">Group</span><span style="font-weight:600;">' + (item.commodityGroup||'—') + '</span>'
+        + '<span style="color:#718096;">UOM</span><span style="font-weight:600;">' + (item.unit||'—') + '</span>'
+        + '</div>';
+    document.getElementById('editInvStock').value = item.stock;
+    document.getElementById('editInvMin').value = item.minLevel;
+    document.getElementById('editInvMax').value = item.maxLevel;
+    document.getElementById('editInvReorder').value = item.reorderQty || 0;
+    document.getElementById('editInventoryModal').classList.add('active');
+}
+
+function stockSaveEdit() {
+    if (!_editingInvDocId) return;
+    var stock = parseInt(document.getElementById('editInvStock').value) || 0;
+    var min = parseInt(document.getElementById('editInvMin').value) || 0;
+    var max = parseInt(document.getElementById('editInvMax').value) || 0;
+    var reorder = parseInt(document.getElementById('editInvReorder').value) || 0;
+    firebase.firestore().collection('stock_inventory').doc(_editingInvDocId).update({
+        stock: stock, min: min, max: max, reorder: reorder,
+        status: stock >= min ? 'OK' : 'Low',
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(function() {
+        closeModal('editInventoryModal');
+        showToast('Stock updated successfully!', 'success');
+    }).catch(function(err) {
+        showToast('Update failed: ' + err.message, 'error');
+    });
+}
+
+function deleteInventoryItem(id) {
+    var inv = window.inventory || [];
+    var item = inv.find(function(i){ return i.id === id; });
+    if (!item) return;
+    if (!confirm('Delete "' + item.itemName + '"? This cannot be undone.')) return;
+    firebase.firestore().collection('stock_inventory').doc(id).delete()
+        .then(function() { showToast('Item deleted successfully!', 'success'); })
+        .catch(function(err) { showToast('Delete failed: ' + err.message, 'error'); });
+}
 </script>
-</body>
 </html>

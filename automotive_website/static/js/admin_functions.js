@@ -1,5 +1,17 @@
 // admin_functions.js — All functions required by admin.html
 
+// ── Toast notification ──────────────────────────────────────
+function showToast(msg, type) {
+    var toast = document.getElementById('toast');
+    if (!toast) return;
+    toast.textContent = msg;
+    toast.className = 'toast-visible toast-' + (type || 'success');
+    clearTimeout(window._toastTimer);
+    window._toastTimer = setTimeout(function() {
+        toast.className = '';
+    }, 3000);
+}
+
 // ── Shared state ────────────────────────────────────────────
 var currentEditingAsset = null;
 var currentEditingInventoryItem = null;
@@ -934,9 +946,9 @@ function renderInventoryList() {
             + '<div>' + (item.reorderQty || item.reorderLevel || '—') + '</div>'
             + '<div>' + statusBadge + '</div>'
             + '<div style="display:flex;gap:0.4rem;">'
-            +   '<button class="btn-small btn-primary" onclick="viewInventoryItem('+item.id+')" title="View">👁️</button>'
-            +   '<button class="btn-small btn-secondary" onclick="editInventoryItem('+item.id+')" title="Edit">✏️</button>'
-            +   '<button class="btn-small btn-danger" onclick="deleteInventoryItem('+item.id+')" title="Delete">🗑️</button>'
+            +   '<button class="btn-small btn-primary" onclick="viewInventoryItem(\''+item.id+'\')" title="View">👁️</button>'
+            +   '<button class="btn-small btn-secondary" onclick="editInventoryItem(\''+item.id+'\')" title="Edit">✏️</button>'
+            +   '<button class="btn-small btn-danger" onclick="deleteInventoryItem(\''+item.id+'\')" title="Delete">🗑️</button>'
             + '</div></div>';
     }).join('');
 }
@@ -1162,45 +1174,31 @@ function openStaffReceiveDeliveryModal() {
 // ── Inventory Transactions ──────────────────────────────────
 function renderInventoryTransactions(filter) {
     filter = filter || '';
-    var txns = [];
-    var today = new Date().toISOString().split('T')[0];
 
-    (window.deliveryRecords || []).forEach(function(d) {
-        txns.push({
-            date: d.date || today,
-            item: d.itemName || d.itemNum || '-',
-            description: 'Received delivery — ' + (d.supplier||'N/A'),
-            type: 'IN',
-            qty: d.quantity || 0,
-            by: d.receivedBy || 'Staff'
-        });
+    // Use Firebase transactions data
+    var txns = (window._fbTransactions || []).map(function(t) {
+        return {
+            date: t.date || '',
+            item: t.item || t.name || '—',
+            description: t.desc || t.description || '—',
+            type: (t.type || 'IN').toUpperCase(),
+            qty: t.qty || t.quantity || 0,
+            by: t.by || t.performedBy || '—'
+        };
     });
 
-    (window.issuances || []).filter(function(i){ return i.itemType !== 'Service'; }).forEach(function(i) {
-        txns.push({
-            date: i.date || today,
-            item: i.itemName || i.itemNum || '-',
-            description: 'Issued for ' + (i.assetNum||'N/A'),
-            type: 'OUT',
-            qty: i.quantity || 0,
-            by: i.issuedBy || 'Staff'
-        });
-    });
-
-    txns.sort(function(a,b){ return new Date(b.date) - new Date(a.date); });
-
-    var s = function(id,val){ var el=document.getElementById(id); if(el) el.textContent=val; };
+    var s = function(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; };
     s('txnTotal', txns.length);
-    s('txnIn', txns.filter(function(t){ return t.type==='IN'; }).length);
-    s('txnOut', txns.filter(function(t){ return t.type==='OUT'; }).length);
-    var items = new Set(txns.map(function(t){ return t.item; }));
-    s('txnItems', items.size);
+    s('txnIn',  txns.filter(function(t){ return t.type === 'IN'; }).length);
+    s('txnOut', txns.filter(function(t){ return t.type === 'OUT'; }).length);
 
-    var search = (document.getElementById('txnSearch')||{}).value || '';
+    var search = (document.getElementById('txnSearch') || {}).value || '';
     var filtered = txns;
     if (search.trim()) {
         var q = search.toLowerCase();
-        filtered = txns.filter(function(t){ return t.item.toLowerCase().includes(q) || t.description.toLowerCase().includes(q); });
+        filtered = txns.filter(function(t) {
+            return (t.item + t.description + t.by).toLowerCase().includes(q);
+        });
     }
 
     var list = document.getElementById('txnList');
@@ -1210,12 +1208,15 @@ function renderInventoryTransactions(filter) {
         return;
     }
     list.innerHTML = filtered.map(function(t) {
-        var typeColor = t.type === 'IN' ? '#38a169' : '#e53e3e';
+        var isIn = t.type === 'IN';
+        var typeColor = isIn ? '#38a169' : '#e53e3e';
+        var typeBg    = isIn ? '#c6f6d5' : '#fed7d7';
+        var dateStr = t.date ? t.date : '—';
         return '<div class="table-row" style="grid-template-columns:120px 1fr 1.5fr 80px 80px 100px;">'
-            + '<div>' + new Date(t.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) + '</div>'
+            + '<div>' + dateStr + '</div>'
             + '<div><strong>' + t.item + '</strong></div>'
             + '<div>' + t.description + '</div>'
-            + '<div><span style="background:'+(t.type==='IN'?'#c6f6d5':'#fed7d7')+';color:'+typeColor+';padding:0.2rem 0.6rem;border-radius:20px;font-size:0.78rem;font-weight:700;">' + t.type + '</span></div>'
+            + '<div><span style="background:' + typeBg + ';color:' + typeColor + ';padding:0.2rem 0.6rem;border-radius:20px;font-size:0.78rem;font-weight:700;">' + t.type + '</span></div>'
             + '<div>' + t.qty + '</div>'
             + '<div>' + t.by + '</div>'
             + '</div>';
@@ -1239,6 +1240,13 @@ function renderItemMasterList() {
         filtered = itemMaster.filter(function(i){ return (i.itemName||'').toLowerCase().includes(q) || (i.itemNum||'').toLowerCase().includes(q); });
     }
 
+    // Sort by item number sequentially (ITM-001, ITM-002, ...)
+    filtered = filtered.slice().sort(function(a, b) {
+        var na = parseInt((a.itemNum || '').replace(/[^0-9]/g, '')) || 0;
+        var nb = parseInt((b.itemNum || '').replace(/[^0-9]/g, '')) || 0;
+        return na - nb;
+    });
+
     if (filtered.length === 0) {
         list.innerHTML = '<div class="table-row" style="text-align:center;color:#718096;padding:2rem;">No items found.</div>';
         return;
@@ -1252,7 +1260,7 @@ function renderItemMasterList() {
             + '<div>' + (item.commodityGroup||'-') + '</div>'
             + '<div>' + (item.uom||'-') + '</div>'
             + '<div><span style="background:'+(item.itemType==='Service'?'#ebf8ff':'#f0fff4')+';color:'+(item.itemType==='Service'?'#2c5282':'#276749')+';padding:0.2rem 0.6rem;border-radius:20px;font-size:0.78rem;font-weight:700;">' + (item.itemType||'-') + '</span></div>'
-            + '<div>₱' + ((item.cost||0).toLocaleString('en-PH',{minimumFractionDigits:2})) + '</div>'
+            + '<div>₱' + (parseFloat(String(item.cost||0).replace(/[₱,]/g,''))||0).toLocaleString('en-PH',{minimumFractionDigits:2}) + '</div>'
             + '<div style="display:flex;gap:0.4rem;">'
             +   '<button class="btn-small btn-primary" onclick="viewItemMasterDetails(\'' + item.itemNum + '\')" title="View">👁️</button>'
             +   '<button class="btn-small btn-secondary" onclick="editItemMaster(\'' + item.itemNum + '\')" title="Edit">✏️</button>'
@@ -1300,10 +1308,18 @@ function onItemMasterCommodityGroupChange(select) {
 function openAddItemMasterModal() {
     currentEditingItemMaster = null;
     document.getElementById('itemMasterModalTitle').textContent = 'Add Item';
+    var submitBtn = document.getElementById('imSubmitBtn');
+    if (submitBtn) submitBtn.textContent = '💾 Save';
     document.getElementById('addItemMasterForm').reset();
     populateItemMasterDropdowns();
     var itemMaster = window.itemMaster || [];
-    document.getElementById('itemMasterItemNum').value = 'ITM-' + String(itemMaster.length + 1).padStart(3,'0');
+    // Find highest existing ITM-XXX number and increment — same as mobile app
+    var maxNum = 0;
+    itemMaster.forEach(function(i) {
+        var n = parseInt((i.itemNum || '').replace(/[^0-9]/g, '')) || 0;
+        if (n > maxNum) maxNum = n;
+    });
+    document.getElementById('itemMasterItemNum').value = 'ITM-' + String(maxNum + 1).padStart(3, '0');
     document.getElementById('addItemMasterModal').classList.add('active');
 }
 
@@ -1314,6 +1330,8 @@ function editItemMaster(itemNum) {
     currentEditingItemMaster = item;
     populateItemMasterDropdowns();
     document.getElementById('itemMasterModalTitle').textContent = 'Edit Item';
+    var submitBtn = document.getElementById('imSubmitBtn');
+    if (submitBtn) submitBtn.textContent = '💾 Update';
     var form = document.getElementById('addItemMasterForm');
     form.elements.itemNum.value = item.itemNum;
     form.elements.itemName.value = item.itemName;
@@ -1330,25 +1348,117 @@ function editItemMaster(itemNum) {
 
 function deleteItemMaster(itemNum) {
     if (!confirm('Delete item ' + itemNum + '?')) return;
-    window.itemMaster = (window.itemMaster||[]).filter(function(i){ return i.itemNum !== itemNum; });
-    renderItemMasterList();
+    var fbItem = (window._fbItemMaster || []).find(function(i){ return i.num === itemNum; });
+    if (!fbItem || !fbItem._id) { alert('Item not found in database.'); return; }
+    firebase.firestore().collection('item_master').doc(fbItem._id).delete()
+        .then(function() { showToast('Item deleted successfully!', 'success'); })
+        .catch(function(err) { showToast('Delete failed: ' + err.message, 'error'); });
 }
 
 function viewItemMasterDetails(itemNum) {
     var itemMaster = window.itemMaster || [];
     var item = itemMaster.find(function(i){ return i.itemNum === itemNum; });
     if (!item) return;
-    var el = function(id){ return document.getElementById(id); };
-    if (el('imItemName')) el('imItemName').textContent = item.itemName;
-    if (el('imItemNum')) el('imItemNum').textContent = item.itemNum;
-    if (el('imCost')) el('imCost').textContent = '₱' + ((item.cost||0).toLocaleString('en-PH',{minimumFractionDigits:2}));
-    if (el('imUOM')) el('imUOM').textContent = item.uom || '-';
-    if (el('imSKU')) el('imSKU').textContent = item.sku || '-';
-    if (el('imDesc')) el('imDesc').textContent = item.description || '-';
-    if (el('imBarcode')) el('imBarcode').textContent = item.barcode || '-';
-    if (el('imQR')) el('imQR').textContent = item.qrcode || '-';
-    if (el('imTypeBadge')) el('imTypeBadge').innerHTML = '<span style="background:'+(item.itemType==='Service'?'#ebf8ff':'#f0fff4')+';color:'+(item.itemType==='Service'?'#2c5282':'#276749')+';padding:0.3rem 0.85rem;border-radius:20px;font-size:0.78rem;font-weight:700;">'+item.itemType+'</span>';
-    if (el('imGroupBadge')) el('imGroupBadge').textContent = item.commodityGroup || '-';
+    var isSvc = item.itemType === 'Service';
+
+    // Header color — red for Material, blue for Service
+    var header = document.getElementById('imDetailHeader');
+    if (header) header.style.background = isSvc
+        ? 'linear-gradient(135deg,#003087,#00205b)'
+        : 'linear-gradient(135deg,#E31E24,#C41E3A)';
+
+    var iconWrap = document.getElementById('imDetailIconWrap');
+    if (iconWrap) iconWrap.textContent = isSvc ? '🔧' : '📦';
+
+    var nameEl = document.getElementById('imItemName');
+    if (nameEl) nameEl.textContent = item.itemName;
+
+    var groupEl = document.getElementById('imGroupBadge');
+    if (groupEl) groupEl.textContent = item.commodityGroup || '—';
+
+    // Detail rows — same as mobile _detailRow
+    var rows = [
+        ['Item Number', item.itemNum || '—'],
+        ['SKU', item.sku || '—'],
+        ['Item Name', item.itemName || '—'],
+        ['Description', item.description || '—'],
+        ['Commodity Group', item.commodityGroup || '—'],
+        ['UOM', item.uom || '—'],
+        ['Cost', '₱' + (parseFloat(String(item.cost||0).replace(/[₱,]/g,''))||0).toLocaleString('en-PH',{minimumFractionDigits:2})],
+        ['Type', item.itemType || '—'],
+    ];
+    var rowsEl = document.getElementById('imDetailRows');
+    if (rowsEl) rowsEl.innerHTML = rows.map(function(r) {
+        return '<div style="display:flex;padding:0.55rem 0;border-bottom:1px solid #f7fafc;">'
+            + '<span style="width:130px;flex-shrink:0;font-size:0.8rem;color:#718096;font-weight:500;">' + r[0] + '</span>'
+            + '<span style="font-size:0.85rem;font-weight:600;color:#1a202c;flex:1;">' + r[1] + '</span>'
+            + '</div>';
+    }).join('');
+
+    // Barcode/QR — only for Material
+    var scanSection = document.getElementById('imScanSection');
+    if (scanSection) {
+        if (!isSvc) {
+            scanSection.style.display = 'block';
+            var barcodeEl = document.getElementById('imBarcode');
+            var qrEl = document.getElementById('imQR');
+            if (barcodeEl) barcodeEl.textContent = item.barcode || '—';
+            if (qrEl) qrEl.textContent = item.qrcode || '—';
+
+            // Render barcode image
+            var barcodeSvg = document.getElementById('imBarcodeImg');
+            if (barcodeSvg && item.barcode && typeof JsBarcode !== 'undefined') {
+                try {
+                    JsBarcode(barcodeSvg, item.barcode, {
+                        format: 'CODE128',
+                        width: 1.8,
+                        height: 60,
+                        displayValue: false,
+                        margin: 4,
+                    });
+                    barcodeSvg.style.display = 'block';
+                } catch(e) {
+                    barcodeSvg.style.display = 'none';
+                }
+            } else if (barcodeSvg) {
+                barcodeSvg.style.display = 'none';
+            }
+
+            // Render QR code image
+            var qrImgEl = document.getElementById('imQRImg');
+            if (qrImgEl) {
+                qrImgEl.innerHTML = '';
+                if (item.qrcode && typeof QRCode !== 'undefined') {
+                    try {
+                        new QRCode(qrImgEl, {
+                            text: item.qrcode,
+                            width: 128,
+                            height: 128,
+                            colorDark: '#1a202c',
+                            colorLight: '#ffffff',
+                            correctLevel: QRCode.CorrectLevel.M,
+                        });
+                    } catch(e) {
+                        qrImgEl.textContent = item.qrcode;
+                    }
+                } else if (qrImgEl && !item.qrcode) {
+                    qrImgEl.textContent = '—';
+                }
+            }
+        } else {
+            scanSection.style.display = 'none';
+        }
+    }
+
+    // Edit button
+    var editBtn = document.getElementById('imDetailEditBtn');
+    if (editBtn) {
+        editBtn.onclick = function() {
+            closeModal('itemMasterDetailsModal');
+            editItemMaster(itemNum);
+        };
+    }
+
     document.getElementById('itemMasterDetailsModal').classList.add('active');
 }
 
@@ -1374,41 +1484,45 @@ document.addEventListener('DOMContentLoaded', function() {
         addItemMasterForm.addEventListener('submit', function(e) {
             e.preventDefault();
             var form = e.target;
-            var itemMaster = window.itemMaster || [];
             var itemNum = form.elements.itemNum.value.trim();
             var itemName = form.elements.itemName.value.trim();
+            if (!itemName) { alert('Item Name is required.'); return; }
+
+            var data = {
+                num:    itemNum,
+                name:   itemName,
+                desc:   form.elements.description.value.trim(),
+                sku:    form.elements.sku.value.trim(),
+                group:  form.elements.commodityGroup.value,
+                uom:    form.elements.uom.value,
+                cost:   parseFloat(form.elements.cost.value) || 0,
+                type:   form.elements.itemType.value,
+                barcode: form.elements.barcode.value.trim(),
+                qr:     form.elements.qrcode.value.trim(),
+            };
+
+            var db = firebase.firestore();
 
             if (currentEditingItemMaster) {
-                var item = itemMaster.find(function(i){ return i.itemNum === currentEditingItemMaster.itemNum; });
-                if (item) {
-                    item.itemName = itemName;
-                    item.description = form.elements.description.value;
-                    item.sku = form.elements.sku.value;
-                    item.commodityGroup = form.elements.commodityGroup.value;
-                    item.uom = form.elements.uom.value;
-                    item.cost = parseFloat(form.elements.cost.value)||0;
-                    item.itemType = form.elements.itemType.value;
-                    item.barcode = form.elements.barcode.value;
-                    item.qrcode = form.elements.qrcode.value;
-                }
-                alert('✅ Item updated!');
+                var fbItem = (window._fbItemMaster || []).find(function(i){ return i.num === currentEditingItemMaster.itemNum; });
+                if (!fbItem || !fbItem._id) { alert('Item not found in database.'); return; }
+                db.collection('item_master').doc(fbItem._id).update(data)
+                    .then(function() {
+                        showToast('Item updated successfully!', 'success');
+                        closeModal('addItemMasterModal');
+                    })
+                    .catch(function(err) { showToast('Update failed: ' + err.message, 'error'); });
             } else {
-                itemMaster.push({
-                    itemNum: itemNum, itemName: itemName,
-                    description: form.elements.description.value,
-                    sku: form.elements.sku.value,
-                    commodityGroup: form.elements.commodityGroup.value,
-                    uom: form.elements.uom.value,
-                    cost: parseFloat(form.elements.cost.value)||0,
-                    itemType: form.elements.itemType.value,
-                    barcode: form.elements.barcode.value,
-                    qrcode: form.elements.qrcode.value
-                });
-                window.itemMaster = itemMaster;
-                alert('✅ Item added!');
+                var isDuplicate = (window.itemMaster || []).some(function(i){ return i.itemNum === itemNum; });
+                if (isDuplicate) { alert('Item Number already exists.'); return; }
+                data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                db.collection('item_master').add(data)
+                    .then(function() {
+                        showToast('Item added successfully!', 'success');
+                        closeModal('addItemMasterModal');
+                    })
+                    .catch(function(err) { showToast('Save failed: ' + err.message, 'error'); });
             }
-            closeModal('addItemMasterModal');
-            renderItemMasterList();
         });
     }
 });

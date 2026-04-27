@@ -32,6 +32,7 @@
 
   function _initFirestore(user) {
     const db = firebase.firestore();
+    window.db = db;
 
     // ── Load user info from Firestore ──────────────────────
     const apUser = JSON.parse(sessionStorage.getItem('apUser') || '{}');
@@ -181,7 +182,7 @@
         description: i.desc || i.description || '',
         commodityGroup: i.group || '',
         uom: i.uom || '',
-        cost: parseFloat(i.cost || 0),
+        cost: parseFloat(String(i.cost || 0).replace(/[₱,]/g, '')) || 0,
         itemType: i.type || 'Material',
         barcode: i.barcode || '',
         qrcode: i.qr || i.qrcode || '',
@@ -297,40 +298,49 @@
     _setStat('statLowStock', lowStock);
 
     const oneWeekAgo = new Date(now - 7 * 86400000);
-    const servicesThisWeek = services.filter(s => {
-      if (!s.createdAt) return false;
-      const d = s.createdAt.toDate ? s.createdAt.toDate() : new Date(s.createdAt);
-      return d >= oneWeekAgo;
-    }).length;
-    _setStat('statServicesWeek', servicesThisWeek);
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const todayFormatted = `${months[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()}`;
+    const servicesToday = services.filter(s => (s.date || '') === todayFormatted).length;
+    _setStat('statServicesWeek', servicesToday);
 
     // Update the overview stat cards directly
     const statCards = document.querySelectorAll('#overview .stat-number');
     if (statCards[0]) statCards[0].textContent = vehicles.length;
     if (statCards[1]) statCards[1].textContent = dueForPms;
     if (statCards[2]) statCards[2].textContent = lowStock;
-    if (statCards[3]) statCards[3].textContent = servicesThisWeek;
+    if (statCards[3]) statCards[3].textContent = servicesToday;
 
-    // Recent services table
-    _renderRecentServices(services.slice(0, 5));
+    // Recent services table → Today's Service Schedule
+    _renderTodayServices(services);
   }
 
-  function _renderRecentServices(services) {
-    const container = document.querySelector('#overview .data-table');
+  function _renderTodayServices(services) {
+    const container = document.getElementById('todayServicesList');
     if (!container) return;
-    const rows = container.querySelectorAll('.table-row:not(:first-child)');
-    rows.forEach(r => r.remove());
+    container.innerHTML = '';
 
-    if (!services.length) return;
-    services.forEach(s => {
+    const now = new Date();
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const todayFormatted = `${months[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()}`;
+
+    const todayServices = services.filter(s => (s.date || '') === todayFormatted);
+
+    if (!todayServices.length) {
+      container.innerHTML = `<div style="padding:1.5rem;text-align:center;color:#718096;font-size:0.9rem;">No services scheduled for today.</div>`;
+      return;
+    }
+
+    todayServices.forEach(s => {
       const row = document.createElement('div');
       row.className = 'table-row';
-      const statusClass = (s.status || '').toLowerCase() === 'completed' ? 'status-completed'
-        : (s.status || '').toLowerCase() === 'ongoing' ? 'status-pending' : 'status-pending';
+      row.style.gridTemplateColumns = '1fr 1.5fr 1fr 1fr';
+      const status = (s.status || '').toLowerCase();
+      const statusClass = status === 'completed' ? 'status-completed'
+        : status === 'ongoing' ? 'status-pending' : 'status-pending';
       row.innerHTML = `
         <div><strong>${s.plate || '—'}</strong></div>
         <div>${_getFirstService(s)}</div>
-        <div>${s.date || '—'}</div>
+        <div>${s.mechanic || '—'}</div>
         <div><span class="status-badge ${statusClass}">${s.status || '—'}</span></div>`;
       container.appendChild(row);
     });

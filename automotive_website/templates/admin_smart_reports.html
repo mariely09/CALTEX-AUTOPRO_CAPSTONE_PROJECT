@@ -9,7 +9,9 @@
 </head>
 <body class="portal-body" data-page="smart-reports">
 
-<div class="admin-dashboard" style="display:flex;">
+<div class="admin-dashboard" style="display:flex;flex-direction:column;">
+    <div id="headerContainer"></div>
+    <div class="admin-dashboard-body">
     <div id="sidebarContainer"></div>
 
     <div class="admin-main">
@@ -70,7 +72,9 @@
                 <div class="sr-chat-hint">Press Enter to send &nbsp;·&nbsp; Shift+Enter for new line</div>
             </div>
         </div>
+        </div>
     </div>
+    </div><!-- /.admin-dashboard-body -->
 </div>
 
 <div id="toast"></div>
@@ -97,10 +101,6 @@
 
 <script src="../static/js/admin_functions.js"></script>
 <script src="../static/js/admin.js"></script>
-<script>
-    fetch('admin_sidebar.html').then(r => r.text()).then(html => {
-        document.getElementById('sidebarContainer').innerHTML = html;
-    });
-</script>
+<script src="../static/js/admin_sidebar.js"></script>
 </body>
 </html>

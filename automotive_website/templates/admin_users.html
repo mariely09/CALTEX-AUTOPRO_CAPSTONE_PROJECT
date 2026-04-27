@@ -9,7 +9,9 @@
 </head>
 <body class="portal-body" data-page="users">
 
-<div class="admin-dashboard" style="display:flex;">
+<div class="admin-dashboard" style="display:flex;flex-direction:column;">
+    <div id="headerContainer"></div>
+    <div class="admin-dashboard-body">
     <div id="sidebarContainer"></div>
 
     <div class="admin-main">
@@ -17,9 +19,6 @@
             <div>
                 <div class="breadcrumb">Admin Portal</div>
                 <div class="admin-header-title">User Management</div>
-            </div>
-            <div class="admin-header-actions">
-                <button class="btn-icon btn-primary" onclick="openAddUserModal()"><span>➕</span> Add User</button>
             </div>
         </div>
 
@@ -45,11 +44,6 @@
                 </div>
             </div>
 
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;gap:1rem;flex-wrap:wrap;">
-                <input type="text" class="search-bar" placeholder="Search users..." id="userSearch" oninput="renderUsersList()" style="width:280px;">
-                <button class="btn-icon btn-primary" onclick="openAddUserModal()"><span>➕</span> Add User</button>
-            </div>
-
             <div class="data-table">
                 <div class="table-row" style="background:#f7fafc;font-weight:bold;border-bottom:2px solid #e2e8f0;grid-template-columns:40px 1.5fr 1fr 1.5fr 1fr 1fr 140px;">
                     <div>#</div><div>Full Name</div><div>Username</div><div>Email</div><div>Role</div><div>Status</div><div>Actions</div>
@@ -58,6 +52,7 @@
             </div>
         </div>
     </div>
+    </div><!-- /.admin-dashboard-body -->
 </div>
 
 <div id="toast"></div>
@@ -84,10 +79,6 @@
 
 <script src="../static/js/admin_functions.js"></script>
 <script src="../static/js/admin.js"></script>
-<script>
-    fetch('admin_sidebar.html').then(r => r.text()).then(html => {
-        document.getElementById('sidebarContainer').innerHTML = html;
-    });
-</script>
+<script src="../static/js/admin_sidebar.js"></script>
 </body>
 </html>

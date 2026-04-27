@@ -9,7 +9,9 @@
 </head>
 <body class="portal-body" data-page="assets">
 
-<div class="admin-dashboard" style="display:flex;">
+<div class="admin-dashboard" style="display:flex;flex-direction:column;">
+    <div id="headerContainer"></div>
+    <div class="admin-dashboard-body">
     <div id="sidebarContainer"></div>
 
     <div class="admin-main">
@@ -18,24 +20,14 @@
                 <div class="breadcrumb">Admin Portal › Vehicle Maintenance Management</div>
                 <div class="admin-header-title">Vehicle List</div>
             </div>
-            <div class="admin-header-actions">
-                <button class="btn-icon btn-secondary" onclick="openAssetPlateScanModal()">
-                    <span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></span>
-                    Scan Plate
-                </button>
-                <button class="btn-icon btn-primary" onclick="openAddAssetModal()"><span>➕</span> Add Vehicle</button>
-            </div>
         </div>
 
         <div class="admin-content">
             <div class="data-table">
-                <div class="table-header">
-                    <span>All Vehicles</span>
-                    <div class="table-actions">
-                        <input type="text" class="search-bar" placeholder="Search vehicles..." id="assetSearch" oninput="renderAssetsList()">
-                        <button class="btn-icon btn-secondary" onclick="openAssetPlateScanModal()"><span>📷</span> Scan Plate</button>
-                        <button class="btn-icon btn-primary" onclick="openAddAssetModal()"><span>➕</span> Add Vehicle</button>
-                    </div>
+                <div class="table-actions" style="display:flex;justify-content:flex-end;gap:0.5rem;padding:0.75rem 1rem;border-bottom:1px solid #e2e8f0;">
+                    <input type="text" class="search-bar" placeholder="Search assets..." id="assetSearch">
+                    <button class="btn-icon btn-secondary" onclick="openAssetPlateScanModal()"><span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></span> Scan Plate</button>
+                    <button class="btn-icon btn-primary" onclick="openAddAssetModal()"><span>➕</span> Add Vehicle</button>
                 </div>
                 <div class="table-row" style="background:#f7fafc;font-weight:bold;border-bottom:2px solid #e2e8f0;grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr 1fr 120px;">
                     <div>Plate Number</div><div>Vehicle Type</div><div>Owner</div>
@@ -45,6 +37,7 @@
             </div>
         </div>
     </div>
+    </div><!-- /.admin-dashboard-body -->
 </div>
 
 <div id="toast"></div>
@@ -71,10 +64,6 @@
 
 <script src="../static/js/admin_functions.js"></script>
 <script src="../static/js/admin.js"></script>
-<script>
-    fetch('admin_sidebar.html').then(r => r.text()).then(html => {
-        document.getElementById('sidebarContainer').innerHTML = html;
-    });
-</script>
+<script src="../static/js/admin_sidebar.js"></script>
 </body>
 </html>
