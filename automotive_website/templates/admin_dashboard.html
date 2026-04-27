@@ -270,16 +270,19 @@
         const validSections = ['issuance', 'inventory-transactions'];
         if (validSections.includes(hash)) {
           document.addEventListener('DOMContentLoaded', function() {
-            // Update data-page so sidebar highlights correctly
             document.body.setAttribute('data-page', hash);
-            // Hide overview, show target section
             document.querySelectorAll('.admin-section').forEach(s => s.classList.remove('active'));
             const target = document.getElementById(hash);
             if (target) target.classList.add('active');
-            // Update breadcrumb title
             const titles = { 'issuance': 'Issuances', 'inventory-transactions': 'Inventory Transactions' };
             const titleEl = document.getElementById('currentSectionTitle');
             if (titleEl && titles[hash]) titleEl.textContent = titles[hash];
+            // Re-render after Firebase data loads
+            if (hash === 'inventory-transactions') {
+              setTimeout(function() {
+                if (typeof renderInventoryTransactions === 'function') renderInventoryTransactions();
+              }, 1500);
+            }
           });
         }
       })();

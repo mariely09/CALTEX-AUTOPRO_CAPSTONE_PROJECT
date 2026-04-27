@@ -225,8 +225,7 @@
     db.collection('transactions').orderBy('createdAt', 'desc').onSnapshot(snap => {
       window._fbTransactions = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
       if (typeof renderInventoryTransactions === 'function') {
-        const section = document.querySelector('.admin-section.active');
-        if (!section || section.id === 'inventory-transactions') renderInventoryTransactions();
+        renderInventoryTransactions();
       }
       _updateTransactionStats();
     });
