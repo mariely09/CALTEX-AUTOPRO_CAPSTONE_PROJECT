@@ -9,10 +9,12 @@ class AdminDomainManagement extends StatefulWidget {
 }
 
 class _AdminDomainManagementState extends State<AdminDomainManagement> {
+  static const _red = Color(0xFFE8001C);
+
   final _domains = [
-    {'key': 'commodity_groups', 'label': 'Commodity Groups', 'icon': Icons.category_outlined, 'color': Color(0xFF003087)},
-    {'key': 'uom', 'label': 'Units of Measure', 'icon': Icons.straighten_outlined, 'color': Colors.teal},
-    {'key': 'vehicle_types', 'label': 'Vehicle Types', 'icon': Icons.directions_car_outlined, 'color': Color(0xFFE8001C)},
+    {'key': 'commodity_groups', 'label': 'Commodity Groups', 'icon': Icons.category_outlined,      'color': _red},
+    {'key': 'uom',              'label': 'Units of Measure',  'icon': Icons.straighten_outlined,    'color': _red},
+    {'key': 'vehicle_types',    'label': 'Vehicle Types',     'icon': Icons.directions_car_outlined, 'color': _red},
   ];
 
   static const _seeds = {
@@ -126,6 +128,7 @@ class _DomainDetailScreenState extends State<_DomainDetailScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
@@ -194,7 +197,11 @@ class _DomainDetailScreenState extends State<_DomainDetailScreen> {
                   }
                 },
                 style: ElevatedButton.styleFrom(backgroundColor: widget.color, foregroundColor: Colors.white),
-                child: Text(doc == null ? '💾 Save' : '💾 Update'),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.save_outlined, size: 16),
+                  const SizedBox(width: 6),
+                  Text(doc == null ? 'Save' : 'Update'),
+                ]),
               )),
             ]),
           ]),

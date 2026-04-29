@@ -125,12 +125,24 @@ function escapeHtml(str) {
 function renderAssetsList() {
     var assetsList = document.getElementById('assetsList');
     if (!assetsList) return;
-    // Use Firebase data if available, fallback to local data.js
     var assets = window.assets || [];
 
     if (assets.length === 0) {
         assetsList.innerHTML = '<div class="table-row" style="text-align:center;color:#718096;padding:2rem;">No assets found.</div>';
         return;
+    }
+
+    // Apply search filter
+    var search = (document.getElementById('assetSearch') || {}).value || '';
+    var filtered = assets;
+    if (search.trim()) {
+        var q = search.toLowerCase();
+        filtered = assets.filter(function(a) {
+            return (a.plateNumber||'').toLowerCase().includes(q)
+                || (a.type||'').toLowerCase().includes(q)
+                || (a.owner||'').toLowerCase().includes(q)
+                || (a.assetDescription||'').toLowerCase().includes(q);
+        });
     }
 
     var today = new Date(); today.setHours(0,0,0,0);
@@ -157,7 +169,17 @@ function renderAssetsList() {
         return '<span class="status-badge status-active">Active</span>';
     }
 
-    assetsList.innerHTML = assets.map(function(asset) {
+    if (filtered.length === 0) {
+        assetsList.innerHTML = '<div class="table-row" style="text-align:center;color:#718096;padding:2rem;">No vehicles found.</div>';
+        return;
+    }
+
+    // Sort alphabetically by plate number (same as mobile app)
+    filtered = filtered.slice().sort(function(a, b) {
+        return (a.plateNumber || '').localeCompare(b.plateNumber || '');
+    });
+
+    assetsList.innerHTML = filtered.map(function(asset) {
         return '<div class="table-row" style="grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr 1fr 120px;">'
             + '<div>' + asset.plateNumber + '</div>'
             + '<div>' + (asset.icon||'') + ' ' + (asset.type||'-') + '</div>'
@@ -167,9 +189,9 @@ function renderAssetsList() {
             + '<div>' + (asset.nextPMSDue ? new Date(asset.nextPMSDue).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '-') + '</div>'
             + '<div>' + getStatusBadge(asset) + '</div>'
             + '<div style="display:flex;gap:0.4rem;">'
-            +   '<button class="btn-small btn-primary" onclick="viewAssetDetails(\'' + asset.assetNum + '\')" title="View">👁️</button>'
-            +   '<button class="btn-small btn-secondary" onclick="editAsset(\'' + asset.assetNum + '\')" title="Edit">✏️</button>'
-            +   '<button class="btn-small btn-danger" onclick="deleteAsset(\'' + asset.assetNum + '\')" title="Delete">🗑️</button>'
+            +   '<button class="btn-small btn-primary" onclick="viewAssetDetails(\'' + asset.assetNum + '\')" title="View" style="display:inline-flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>'
+            +   '<button class="btn-small btn-secondary" onclick="editAsset(\'' + asset.assetNum + '\')" title="Edit" style="display:inline-flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
+            +   '<button class="btn-small btn-danger" onclick="deleteAsset(\'' + asset.assetNum + '\')" title="Delete" style="display:inline-flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>'
             + '</div></div>';
     }).join('');
 }
@@ -363,7 +385,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     asset.serviceFrequency = serviceFreq;
                     if (serviceFreq && !asset.nextPMSDue) asset.nextPMSDue = nextPMSDue;
                 }
-                alert('✅ Asset updated successfully!');
+                showToast('Vehicle updated successfully!', 'success');
             } else {
                 var newAsset = {
                     id: nextAssetId, assetNum: 'ASSET-' + String(nextAssetId).padStart(3,'0'),
@@ -377,7 +399,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 assets.push(newAsset);
                 window.assets = assets;
                 nextAssetId++;
-                alert('✅ Asset added successfully!');
+                showToast('Vehicle added successfully!', 'success');
             }
             closeModal('addAssetModal');
             renderAssetsList();
@@ -409,16 +431,27 @@ function renderServicesList() {
         });
     }
 
-    list.innerHTML = filtered.map(function(s) {
-        var statusClass = s.status === 'completed' ? 'status-completed' : s.status === 'ongoing' ? 'status-active' : 'status-pending';
-        var statusLabel = s.status ? s.status.charAt(0).toUpperCase()+s.status.slice(1) : 'Pending';
-        var topActions = '<button class="btn-small btn-primary" onclick="viewServiceDetails(\''+s.serviceId+'\')" title="View">👁️</button>';
-        if (s.status === 'pending' || s.status === 'ongoing') topActions += '<button class="btn-small btn-secondary" onclick="editService(\''+s.serviceId+'\')" title="Edit">✏️</button>';
-        topActions += '<button class="btn-small btn-danger" onclick="deleteService(\''+s.serviceId+'\')" title="Delete">🗑️</button>';
+    if (filtered.length === 0) {
+        list.innerHTML = '<div class="table-row" style="text-align:center;color:#718096;padding:2rem;">No services found.</div>';
+        return;
+    }
 
-        var bottomAction = '';
-        if (s.status === 'pending') bottomAction = '<button class="btn-small btn-primary" onclick="approveService(\''+s.serviceId+'\')" title="Approve" style="width:100%;">✅ Approve</button>';
-        if (s.status === 'ongoing') bottomAction = '<button class="btn-small btn-success" onclick="completeService(\''+s.serviceId+'\')" title="Mark Complete" style="width:100%;">✔ Complete</button>';
+    list.innerHTML = filtered.map(function(s) {
+        var statusColors = {
+            'completed': { bg: 'rgba(56,161,105,0.1)', color: '#38a169' },
+            'ongoing':   { bg: 'rgba(214,158,46,0.1)', color: '#d69e2e' },
+            'pending':   { bg: 'rgba(113,128,150,0.1)', color: '#718096' },
+        };
+        var sc = statusColors[(s.status||'').toLowerCase()] || statusColors['pending'];
+        var statusLabel = s.status ? s.status.charAt(0).toUpperCase()+s.status.slice(1) : 'Pending';
+        var statusBadge = '<span style="background:' + sc.bg + ';color:' + sc.color + ';padding:0.25rem 0.75rem;border-radius:20px;font-size:0.78rem;font-weight:700;">' + statusLabel + '</span>';
+        var topActions = '<button class="btn-small btn-primary" onclick="viewServiceDetails(\''+s.serviceId+'\')" title="View" style="display:inline-flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>';
+        if (s.status === 'pending' || s.status === 'ongoing') {
+            topActions += '<button class="btn-small btn-secondary" onclick="svcEditFromList(\''+s.serviceId+'\')" title="Edit" style="display:inline-flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>';
+        } else {
+            topActions += '<button class="btn-small btn-secondary" disabled title="Cannot edit completed service" style="display:inline-flex;align-items:center;justify-content:center;opacity:0.4;cursor:not-allowed;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>';
+        }
+        topActions += '<button class="btn-small btn-danger" onclick="deleteService(\''+s.serviceId+'\')" title="Delete" style="display:inline-flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>';
 
         return '<div class="table-row" style="grid-template-columns:1fr 1fr 1.5fr 1fr 1fr 1fr 160px;">'
             + '<div>' + (s.dateServiced ? new Date(s.dateServiced).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '-') + '</div>'
@@ -426,11 +459,8 @@ function renderServicesList() {
             + '<div>' + (s.assetDescription||'-') + '</div>'
             + '<div>' + (s.mechanicName||'-') + '</div>'
             + '<div>₱' + ((s.totalCost||0).toLocaleString()) + '</div>'
-            + '<div><span class="status-badge ' + statusClass + '">' + statusLabel + '</span></div>'
-            + '<div style="display:flex;flex-direction:column;gap:0.3rem;">'
-            +   '<div style="display:flex;gap:0.3rem;">' + topActions + '</div>'
-            +   (bottomAction ? '<div>' + bottomAction + '</div>' : '')
-            + '</div>'
+            + '<div>' + statusBadge + '</div>'
+            + '<div style="display:flex;gap:0.3rem;">' + topActions + '</div>'
             + '</div>';
     }).join('');
 }
@@ -529,7 +559,7 @@ function completeService(serviceId) {
     renderInventoryList();
     renderIssuancesList();
     renderInventoryTransactions();
-    alert('✅ Service marked as completed!');
+    showToast('Service marked as completed!', 'success');
 }
 
 function deleteService(serviceId) {
@@ -539,71 +569,78 @@ function deleteService(serviceId) {
 }
 
 function viewServiceDetails(serviceId) {
-    var serviceTransactions = window.serviceTransactions || [];
-    var s = serviceTransactions.find(function(x){ return x.serviceId === serviceId; });
-    if (!s) return;
-    var el = function(id){ return document.getElementById(id); };
-    if (el('sdAssetNum')) el('sdAssetNum').textContent = s.assetNum || '-';
-    if (el('sdAssetDesc')) el('sdAssetDesc').textContent = s.assetDescription || '-';
-    if (el('sdDate')) el('sdDate').textContent = s.dateServiced ? new Date(s.dateServiced).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}) : '-';
-    if (el('sdMechanic')) el('sdMechanic').textContent = 'Mechanic: ' + (s.mechanicName||'-');
-    if (el('sdTotalCost')) el('sdTotalCost').textContent = '₱' + ((s.totalCost||0).toLocaleString('en-PH',{minimumFractionDigits:2}));
-    if (el('sdCreatedBy')) el('sdCreatedBy').textContent = s.createdBy || '-';
-    if (el('sdCreatedOn')) el('sdCreatedOn').textContent = s.createdOn ? new Date(s.createdOn).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '-';
-    if (el('sdServicesTable')) el('sdServicesTable').innerHTML = (s.servicesRendered||[]).map(function(r){
-        return '<div style="display:flex;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid #f0f4f8;"><span>'+r.description+'</span><span style="font-weight:700;">₱'+((r.cost||0).toLocaleString())+'</span></div>';
-    }).join('') || '<div style="color:#a0aec0;font-size:0.85rem;">No services recorded.</div>';
-    if (el('sdPartsTable')) el('sdPartsTable').innerHTML = (s.spareParts||[]).map(function(p){
-        return '<div style="display:flex;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid #f0f4f8;"><span>'+p.name+' x'+p.quantity+'</span><span style="font-weight:700;">₱'+((p.cost||0).toLocaleString())+'</span></div>';
-    }).join('') || '<div style="color:#a0aec0;font-size:0.85rem;">No materials recorded.</div>';
-    document.getElementById('serviceDetailsModal').classList.add('active');
+    // Delegate to the new Firestore-backed implementation in admin_vehicle_maintenance.html
+    if (typeof window._svcViewDetails === 'function') {
+        window._svcViewDetails(serviceId);
+    }
 }
 
-function editService(serviceId) {
-    var serviceTransactions = window.serviceTransactions || [];
-    var s = serviceTransactions.find(function(x){ return x.serviceId === serviceId; });
-    if (!s) return;
-    currentEditingService = s;
+// Thin wrappers so table action buttons work
+function svcEditFromList(docId) {
+    if (typeof editService === 'function') editService(docId);
+}
+function svcApproveFromList(docId) {
+    var db = firebase.firestore();
+    if (!confirm('Approve this service and set status to Ongoing?')) return;
+    db.collection('maintenance').doc(docId).update({ status: 'Ongoing' }).then(function() {
+        db.collection('maintenance').doc(docId).get().then(function(doc) {
+            if (doc.exists) {
+                var plate = (doc.data().plate || '').trim().toUpperCase();
+                db.collection('vehicles').where('plate', '==', plate).limit(1).get().then(function(vSnap) {
+                    if (!vSnap.empty) vSnap.docs[0].ref.update({ status: 'Under Maintenance' });
+                });
+            }
+        });
+        showToast('Service approved — status set to Ongoing!', 'success');
+    }).catch(function(err) { showToast('Error: ' + err.message, 'error'); });
+}
+function svcCompleteFromList(docId) {
+    if (!confirm('Mark this service as Completed?')) return;
+    // Open the details modal which has the full complete logic
+    viewServiceDetails(docId);
+}
 
-    document.getElementById('addServiceModal').classList.add('active');
-    document.getElementById('serviceModalTitle').textContent = 'Edit Service Transaction';
+function svcParseToInputDate(dateStr) {
+    if (!dateStr) return '';
+    var d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + day;
+}
 
-    // Fill asset fields
-    var assets = window.assets || [];
-    var asset = assets.find(function(a){ return a.assetNum === s.assetNum; });
-    document.getElementById('servicePlateSearch').value = asset ? asset.plateNumber : s.assetNum;
-    document.getElementById('serviceAssetNumDisplay').value = s.assetNum || '';
-    document.getElementById('serviceAssetNumHidden').value = s.assetNum || '';
-    document.getElementById('serviceAssetTypeDisplay').value = asset ? (asset.type || '') : '';
-    document.getElementById('serviceAssetDescription').value = s.assetDescription || '';
+function editService(docId) {
+    var db = firebase.firestore();
+    db.collection('maintenance').doc(docId).get().then(function(doc) {
+        if (!doc.exists) return;
+        var s = doc.data();
+        s._docId = doc.id;
 
-    // Fill form fields
-    var form = document.getElementById('addServiceForm');
-    form.elements.mechanicName.value = s.mechanicName || '';
-    form.elements.dateServiced.value = s.dateServiced || '';
+        window._svcEditingId = doc.id;
+        document.getElementById('svcModalTitle').textContent = 'Edit Service';
+        document.getElementById('svcSubmitBtn').innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Update';
+        document.getElementById('svcModalIcon').innerHTML = '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>';
 
-    // Fill service rows
-    document.getElementById('serviceRowsContainer').innerHTML = '';
-    (s.servicesRendered || []).forEach(function(r) {
-        addServiceRow(r.description, r.quantity, r.uom, r.cost);
+        var plate = s.plate || '';
+        var inp = document.getElementById('svcPlateInput');
+        if (inp) { inp.value = plate; }
+        var hidden = document.getElementById('svcPlateSelect');
+        if (hidden) { hidden.value = plate; }
+        svcPlateSelect(plate);
+
+        document.getElementById('svcMechanic').value = s.mechanic || '';
+        // Convert stored date string to YYYY-MM-DD for the date input
+        document.getElementById('svcDate').value = svcParseToInputDate(s.date || '');
+        document.getElementById('svcSvcRows').innerHTML = '';
+        document.getElementById('svcMatRows').innerHTML = '';
+        (s.svcRows || []).forEach(function(r){ svcAddSvcRow(r.name, r.qty, r.uom, r.cost); });
+        if (!s.svcRows || !s.svcRows.length) svcAddSvcRow();
+        (s.matRows || []).forEach(function(r){ svcAddMatRow(r.name, r.qty, r.uom, r.cost); });
+        if (!s.matRows || !s.matRows.length) svcAddMatRow();
+        svcCalcTotal();
+        document.getElementById('svcAddModal').classList.add('active');
     });
-    if (!s.servicesRendered || s.servicesRendered.length === 0) addServiceRow();
-
-    // Fill material rows
-    document.getElementById('materialRowsContainer').innerHTML = '';
-    (s.spareParts || []).forEach(function(p) {
-        addMaterialRow(p.itemNum, p.quantity, p.uom, p.cost);
-        // Set the select value after row is added
-        var rows = document.querySelectorAll('.material-row');
-        var lastRow = rows[rows.length - 1];
-        if (lastRow) {
-            var sel = lastRow.querySelector('.mat-item');
-            if (sel) sel.value = p.itemNum;
-        }
-    });
-    if (!s.spareParts || s.spareParts.length === 0) addMaterialRow();
-
-    calculateTotalCost();
 }
 
 function openAddServiceModal() {
@@ -946,9 +983,9 @@ function renderInventoryList() {
             + '<div>' + (item.reorderQty || item.reorderLevel || '—') + '</div>'
             + '<div>' + statusBadge + '</div>'
             + '<div style="display:flex;gap:0.4rem;">'
-            +   '<button class="btn-small btn-primary" onclick="viewInventoryItem(\''+item.id+'\')" title="View">👁️</button>'
-            +   '<button class="btn-small btn-secondary" onclick="editInventoryItem(\''+item.id+'\')" title="Edit">✏️</button>'
-            +   '<button class="btn-small btn-danger" onclick="deleteInventoryItem(\''+item.id+'\')" title="Delete">🗑️</button>'
+            +   '<button class="btn-small btn-primary" onclick="viewInventoryItem(\''+item.id+'\')" title="View" style="display:inline-flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>'
+            +   '<button class="btn-small btn-secondary" onclick="editInventoryItem(\''+item.id+'\')" title="Edit" style="display:inline-flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
+            +   '<button class="btn-small btn-danger" onclick="deleteInventoryItem(\''+item.id+'\')" title="Delete" style="display:inline-flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>'
             + '</div></div>';
     }).join('');
 }
@@ -1180,7 +1217,11 @@ function renderInventoryTransactions(filter) {
         return {
             date: t.date || '',
             item: t.item || t.name || '—',
-            description: t.desc || t.description || '—',
+            description: (t.desc || t.description || '—')
+                .replace(/for maintenance SVC-\d+\s*[—\-]\s*/gi, 'for ')
+                .replace(/for maintenance SVC-\d+/gi, '')
+                .replace(/\s*SVC-\d+\s*/gi, '')
+                .trim() || '—',
             type: (t.type || 'IN').toUpperCase(),
             qty: t.qty || t.quantity || 0,
             by: t.by || t.performedBy || '—'
@@ -1209,8 +1250,8 @@ function renderInventoryTransactions(filter) {
     }
     list.innerHTML = filtered.map(function(t) {
         var isIn = t.type === 'IN';
-        var typeColor = isIn ? '#38a169' : '#e53e3e';
-        var typeBg    = isIn ? '#c6f6d5' : '#fed7d7';
+        var typeColor = isIn ? '#003087' : '#E8001C';
+        var typeBg    = isIn ? '#ebf8ff' : '#fed7d7';
         var dateStr = t.date ? t.date : '—';
         return '<div class="table-row" style="grid-template-columns:120px 1fr 1.5fr 80px 80px 100px;">'
             + '<div>' + dateStr + '</div>'
@@ -1224,7 +1265,7 @@ function renderInventoryTransactions(filter) {
 }
 
 function exportInventoryTransactions() {
-    alert('📊 Export feature would generate an Excel/PDF report of all inventory transactions.');
+    window.print();
 }
 
 // ── Item Master ─────────────────────────────────────────────
@@ -1262,33 +1303,43 @@ function renderItemMasterList() {
             + '<div><span style="background:'+(item.itemType==='Service'?'#ebf8ff':'#f0fff4')+';color:'+(item.itemType==='Service'?'#2c5282':'#276749')+';padding:0.2rem 0.6rem;border-radius:20px;font-size:0.78rem;font-weight:700;">' + (item.itemType||'-') + '</span></div>'
             + '<div>₱' + (parseFloat(String(item.cost||0).replace(/[₱,]/g,''))||0).toLocaleString('en-PH',{minimumFractionDigits:2}) + '</div>'
             + '<div style="display:flex;gap:0.4rem;">'
-            +   '<button class="btn-small btn-primary" onclick="viewItemMasterDetails(\'' + item.itemNum + '\')" title="View">👁️</button>'
-            +   '<button class="btn-small btn-secondary" onclick="editItemMaster(\'' + item.itemNum + '\')" title="Edit">✏️</button>'
-            +   '<button class="btn-small btn-danger" onclick="deleteItemMaster(\'' + item.itemNum + '\')" title="Delete">🗑️</button>'
+            +   '<button class="btn-small btn-primary" onclick="viewItemMasterDetails(\'' + item.itemNum + '\')" title="View" style="display:inline-flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>'
+            +   '<button class="btn-small btn-secondary" onclick="editItemMaster(\'' + item.itemNum + '\')" title="Edit" style="display:inline-flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
+            +   '<button class="btn-small btn-danger" onclick="deleteItemMaster(\'' + item.itemNum + '\')" title="Delete" style="display:inline-flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>'
             + '</div></div>';
     }).join('');
 }
 
 function populateItemMasterDropdowns() {
-    var domains = window.domains || [];
-    var itemMaster = window.itemMaster || [];
+    var db = firebase.firestore();
 
-    // Merge domain UOM list with any UOM values already in use
-    var uomDomain = domains.find(function(d){ return d.id==='UOM'; });
-    var uomList = uomDomain ? uomDomain.list.slice() : ['Each','Set','Hour','Piece','Litres','Gallon'];
-    // Add any in-use UOM values not already in the list
-    itemMaster.forEach(function(i) {
-        if (i.uom && !uomList.find(function(v){ return v.toLowerCase() === i.uom.toLowerCase(); })) {
-            uomList.push(i.uom);
-        }
+    // Commodity Groups from Firestore domains/commodity_groups/items
+    db.collection('domains').doc('commodity_groups').collection('items').orderBy('name').get().then(function(snap) {
+        var cgList = snap.docs.map(function(d){ return d.data().name || ''; }).filter(Boolean);
+        if (!cgList.length) cgList = ['Lubricants','Spare Parts','Filter','AutoService'];
+        var cgSel = document.getElementById('itemMasterCommodityGroup');
+        if (cgSel) cgSel.innerHTML = '<option value="">Select group</option>' + cgList.map(function(v){ return '<option value="'+v+'">'+v+'</option>'; }).join('');
     });
-    var uomSel = document.getElementById('itemMasterUOM');
-    if (uomSel) uomSel.innerHTML = '<option value="">Select UOM</option>' + uomList.map(function(v){ return '<option value="'+v+'">'+v+'</option>'; }).join('');
 
-    var cgDomain = domains.find(function(d){ return d.id==='CommodityGroup'; });
-    var cgList = cgDomain ? cgDomain.list : ['Lubricants','Spare Parts','Filter','AutoService'];
-    var cgSel = document.getElementById('itemMasterCommodityGroup');
-    if (cgSel) cgSel.innerHTML = '<option value="">Select Commodity Group</option>' + cgList.map(function(v){ return '<option value="'+v+'">'+v+'</option>'; }).join('');
+    // UOM from Firestore domains/uom/items
+    db.collection('domains').doc('uom').collection('items').orderBy('name').get().then(function(snap) {
+        var uomList = snap.docs.map(function(d){ return d.data().name || ''; }).filter(Boolean);
+        if (!uomList.length) uomList = ['pcs','L','set','job','kg','box','pair','m'];
+        var uomSel = document.getElementById('itemMasterUOM');
+        if (uomSel) uomSel.innerHTML = '<option value="">Select UOM</option>' + uomList.map(function(v){ return '<option value="'+v+'">'+v+'</option>'; }).join('');
+    });
+}
+
+function populateVehicleTypeDropdown(selectId, currentVal) {
+    var sel = document.getElementById(selectId || 'assetTypeSelect');
+    if (!sel) return;
+    firebase.firestore().collection('domains').doc('vehicle_types').collection('items').orderBy('name').get().then(function(snap) {
+        var types = snap.docs.map(function(d){ return d.data().name || ''; }).filter(Boolean);
+        if (!types.length) types = ['Truck','SUV','Sedan','Van','Motorcycle','Bus','Pickup'];
+        sel.innerHTML = '<option value="">Select type</option>' + types.map(function(v){
+            return '<option value="'+v+'"' + (currentVal === v ? ' selected' : '') + '>'+v+'</option>';
+        }).join('');
+    });
 }
 
 function onItemMasterCommodityGroupChange(select) {
@@ -1309,7 +1360,9 @@ function openAddItemMasterModal() {
     currentEditingItemMaster = null;
     document.getElementById('itemMasterModalTitle').textContent = 'Add Item';
     var submitBtn = document.getElementById('imSubmitBtn');
-    if (submitBtn) submitBtn.textContent = '💾 Save';
+    if (submitBtn) submitBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save';
+    var icon = document.getElementById('imModalIcon');
+    if (icon) icon.innerHTML = '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>';
     document.getElementById('addItemMasterForm').reset();
     populateItemMasterDropdowns();
     var itemMaster = window.itemMaster || [];
@@ -1328,21 +1381,46 @@ function editItemMaster(itemNum) {
     var item = itemMaster.find(function(i){ return i.itemNum === itemNum; });
     if (!item) return;
     currentEditingItemMaster = item;
-    populateItemMasterDropdowns();
+
     document.getElementById('itemMasterModalTitle').textContent = 'Edit Item';
     var submitBtn = document.getElementById('imSubmitBtn');
-    if (submitBtn) submitBtn.textContent = '💾 Update';
+    if (submitBtn) submitBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Update';
+    var icon = document.getElementById('imModalIcon');
+    if (icon) icon.innerHTML = '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>';
+
     var form = document.getElementById('addItemMasterForm');
     form.elements.itemNum.value = item.itemNum;
     form.elements.itemName.value = item.itemName;
     form.elements.description.value = item.description || '';
     form.elements.sku.value = item.sku || '';
-    form.elements.commodityGroup.value = item.commodityGroup || '';
-    form.elements.uom.value = item.uom || '';
     form.elements.cost.value = item.cost || '';
     form.elements.itemType.value = item.itemType || '';
     form.elements.barcode.value = item.barcode || '';
     form.elements.qrcode.value = item.qrcode || '';
+
+    // Populate dropdowns from Firestore then set saved values
+    var db = firebase.firestore();
+    db.collection('domains').doc('commodity_groups').collection('items').orderBy('name').get().then(function(snap) {
+        var cgList = snap.docs.map(function(d){ return d.data().name || ''; }).filter(Boolean);
+        if (!cgList.length) cgList = ['Lubricants','Spare Parts','Filter','AutoService'];
+        var cgSel = document.getElementById('itemMasterCommodityGroup');
+        if (cgSel) {
+            cgSel.innerHTML = '<option value="">Select group</option>' + cgList.map(function(v){
+                return '<option value="'+v+'"' + (item.commodityGroup === v ? ' selected' : '') + '>'+v+'</option>';
+            }).join('');
+        }
+    });
+    db.collection('domains').doc('uom').collection('items').orderBy('name').get().then(function(snap) {
+        var uomList = snap.docs.map(function(d){ return d.data().name || ''; }).filter(Boolean);
+        if (!uomList.length) uomList = ['pcs','L','set','job','kg','box','pair','m'];
+        var uomSel = document.getElementById('itemMasterUOM');
+        if (uomSel) {
+            uomSel.innerHTML = '<option value="">Select UOM</option>' + uomList.map(function(v){
+                return '<option value="'+v+'"' + (item.uom === v ? ' selected' : '') + '>'+v+'</option>';
+            }).join('');
+        }
+    });
+
     document.getElementById('addItemMasterModal').classList.add('active');
 }
 
@@ -1368,7 +1446,14 @@ function viewItemMasterDetails(itemNum) {
         : 'linear-gradient(135deg,#E31E24,#C41E3A)';
 
     var iconWrap = document.getElementById('imDetailIconWrap');
-    if (iconWrap) iconWrap.textContent = isSvc ? '🔧' : '📦';
+    if (iconWrap) {
+        var iconEl = document.getElementById('imDetailIcon');
+        if (iconEl) {
+            iconEl.innerHTML = isSvc
+                ? '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>'
+                : '<polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/>';
+        }
+    }
 
     var nameEl = document.getElementById('imItemName');
     if (nameEl) nameEl.textContent = item.itemName;
@@ -1538,12 +1623,23 @@ function renderIssuancesList() {
     s('totalIssuanceServices', issuances.filter(function(i){ return i.itemType==='Service'; }).length);
     s('totalMaterials', issuances.filter(function(i){ return i.itemType!=='Service'; }).length);
 
-    if (issuances.length === 0) {
+    // Filter by search
+    var q = ((document.getElementById('issuanceSearch') || {}).value || '').trim().toLowerCase();
+    var filtered = q ? issuances.filter(function(i) {
+        return (i.assetNum||'').toLowerCase().includes(q)
+            || (i.itemNum||'').toLowerCase().includes(q)
+            || (i.itemName||'').toLowerCase().includes(q)
+            || (i.itemType||'').toLowerCase().includes(q)
+            || (i.commodityGroup||'').toLowerCase().includes(q)
+            || (i.date||'').toLowerCase().includes(q);
+    }) : issuances;
+
+    if (filtered.length === 0) {
         list.innerHTML = '<div style="text-align:center;color:#718096;padding:2rem;">No issuances found.</div>';
         return;
     }
 
-    list.innerHTML = issuances.map(function(i) {
+    list.innerHTML = filtered.map(function(i) {
         return '<div class="table-row" style="min-width:1100px;grid-template-columns:110px 130px 120px 1fr 100px 140px 70px 80px 110px 110px;">'
             + '<div>' + (i.date ? new Date(i.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '-') + '</div>'
             + '<div>' + (i.assetNum||'-') + '</div>'
@@ -1581,8 +1677,9 @@ function renderUsersList() {
 
     var s = function(id,val){ var el=document.getElementById(id); if(el) el.textContent=val; };
     s('userStatTotal', users.length);
-    s('userStatActive', users.filter(function(u){ return u.status==='active'; }).length);
-    s('userStatInactive', users.filter(function(u){ return u.status==='inactive'; }).length);
+    s('userStatAdmin', users.filter(function(u){ return u.role==='admin'; }).length);
+    s('userStatCustomer', users.filter(function(u){ return u.role==='customer'; }).length);
+    s('userStatStaff', users.filter(function(u){ return u.role==='staff'; }).length);
 
     var container = document.getElementById('userCardsList');
     if (!container) return;
@@ -1592,23 +1689,26 @@ function renderUsersList() {
         return;
     }
 
-    var roleColors = { admin:'#E31E24', staff:'#38a169', customer:'#3182ce' };
+    var roleColors = { admin:'#E31E24', staff:'#003087', customer:'#38a169' };
     container.innerHTML = filtered.map(function(u, idx) {
-        var roleColor = roleColors[u.role] || '#718096';
-        var statusBadge = u.status === 'active'
-            ? '<span class="status-badge status-active">Active</span>'
-            : '<span class="status-badge status-completed">Inactive</span>';
+        var roleColor = roleColors[(u.role||'').toLowerCase()] || '#718096';
+        var statusLower = (u.status||'').toLowerCase();
+        var statusBadge = statusLower === 'active'
+            ? '<span style="background:rgba(56,161,105,0.1);color:#38a169;padding:0.2rem 0.6rem;border-radius:20px;font-size:0.78rem;font-weight:700;">Active</span>'
+            : '<span style="background:rgba(113,128,150,0.1);color:#718096;padding:0.2rem 0.6rem;border-radius:20px;font-size:0.78rem;font-weight:700;">Inactive</span>';
+        var roleLabel = (u.role||'');
+        roleLabel = roleLabel.charAt(0).toUpperCase() + roleLabel.slice(1);
         return '<div class="table-row" style="grid-template-columns:40px 1.5fr 1fr 1.5fr 1fr 1fr 140px;">'
             + '<div style="color:#a0aec0;font-size:0.85rem;">' + (idx+1) + '</div>'
             + '<div><strong>' + u.name + '</strong></div>'
             + '<div>' + u.username + '</div>'
             + '<div>' + (u.email||'-') + '</div>'
-            + '<div><span style="background:'+roleColor+'20;color:'+roleColor+';padding:0.2rem 0.6rem;border-radius:20px;font-size:0.78rem;font-weight:700;">' + u.role + '</span></div>'
+            + '<div><span style="background:'+roleColor+'20;color:'+roleColor+';padding:0.2rem 0.6rem;border-radius:20px;font-size:0.78rem;font-weight:700;">' + roleLabel + '</span></div>'
             + '<div>' + statusBadge + '</div>'
             + '<div style="display:flex;gap:0.4rem;">'
-            +   '<button class="btn-small btn-primary" onclick="viewUser('+u.id+')" title="View">👁️</button>'
-            +   '<button class="btn-small btn-secondary" onclick="editUser('+u.id+')" title="Edit">✏️</button>'
-            +   '<button class="btn-small btn-danger" onclick="toggleUserStatus('+u.id+')" title="'+(u.status==='active'?'Deactivate':'Activate')+'">'+(u.status==='active'?'🚫':'✅')+'</button>'
+            +   '<button class="btn-small btn-primary" onclick="viewUser(\''+u.id+'\')" title="View" style="display:inline-flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>'
+            +   '<button class="btn-small btn-secondary" onclick="editUser(\''+u.id+'\')" title="Edit" style="display:inline-flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
+            +   '<button class="btn-small btn-danger" onclick="toggleUserStatus(\''+u.id+'\')" title="'+(statusLower==='active'?'Deactivate':'Activate')+'" style="display:inline-flex;align-items:center;justify-content:center;">'+(statusLower==='active'?'<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>':'<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>')+'</button>'
             + '</div></div>';
     }).join('');
 }
@@ -1623,97 +1723,79 @@ function openAddUserModal() {
 }
 
 function viewUser(userId) {
+    // Delegated to inline script in admin_users.html
     var users = window.users || [];
     var u = users.find(function(x){ return x.id === userId; });
     if (!u) return;
-    var roleColors = { admin:'#E31E24', staff:'#38a169', customer:'#3182ce' };
-    var roleColor = roleColors[u.role] || '#718096';
+    var roleColors = { admin:'#E31E24', staff:'#003087', customer:'#38a169' };
+    var rc = roleColors[(u.role||'').toLowerCase()] || '#718096';
     var header = document.getElementById('vuHeader');
-    if (header) header.style.background = 'linear-gradient(135deg,' + roleColor + ',#1a202c)';
+    if (header) header.style.background = 'linear-gradient(135deg,#E31E24,#C41E3A)';
     var avatar = document.getElementById('vuAvatar');
-    if (avatar) avatar.textContent = u.name.split(' ').map(function(n){ return n[0]; }).join('').toUpperCase().slice(0,2);
-    var nameEl = document.getElementById('vuName'); if (nameEl) nameEl.textContent = u.name;
-    var unEl = document.getElementById('vuUsername'); if (unEl) unEl.textContent = '@' + u.username;
-    var roleBadge = document.getElementById('vuRoleBadge');
-    if (roleBadge) roleBadge.innerHTML = '<span style="background:rgba(255,255,255,0.2);color:white;padding:0.3rem 0.85rem;border-radius:20px;font-size:0.78rem;font-weight:700;">' + u.role + '</span>';
-    var statusBadge = document.getElementById('vuStatusBadge');
-    if (statusBadge) statusBadge.innerHTML = '<span style="background:rgba(255,255,255,0.15);color:white;padding:0.3rem 0.85rem;border-radius:20px;font-size:0.78rem;font-weight:700;">' + u.status + '</span>';
+    if (avatar) avatar.textContent = (u.name||'?').split(' ').map(function(n){ return n[0]; }).join('').toUpperCase().slice(0,2);
+    var nameEl = document.getElementById('vuName'); if (nameEl) nameEl.textContent = u.name || '—';
+    var unEl = document.getElementById('vuUsername'); if (unEl) unEl.textContent = u.username || '—';
+    var roleLabel = (u.role||''); roleLabel = roleLabel.charAt(0).toUpperCase() + roleLabel.slice(1);
+    var statusLower = (u.status||'').toLowerCase();
+    var statusColor = statusLower === 'active' ? '#38a169' : '#718096';
+    var statusLabel = statusLower === 'active' ? 'Active' : 'Inactive';
     var infoGrid = document.getElementById('vuInfoGrid');
     if (infoGrid) infoGrid.innerHTML = [
-        { label:'Email', value: u.email||'-' },
-        { label:'Role', value: u.role },
-        { label:'Status', value: u.status },
-        { label:'Member Since', value: u.createdAt||'-' }
+        ['Email', u.email||'—'],
+        ['Role', '<span style="background:'+rc+'20;color:'+rc+';padding:0.2rem 0.6rem;border-radius:20px;font-size:0.78rem;font-weight:700;">'+roleLabel+'</span>'],
+        ['Status', '<span style="background:'+statusColor+'20;color:'+statusColor+';padding:0.2rem 0.6rem;border-radius:20px;font-size:0.78rem;font-weight:700;">'+statusLabel+'</span>'],
+        ['Username', u.username||'—'],
     ].map(function(item){
-        return '<div style="background:#f7fafc;border-radius:10px;padding:0.85rem;"><div style="font-size:0.7rem;color:#718096;font-weight:700;text-transform:uppercase;margin-bottom:0.3rem;">'+item.label+'</div><div style="font-weight:700;color:#1a202c;">'+item.value+'</div></div>';
+        return '<div style="background:white;border-radius:10px;padding:0.85rem;border:1px solid #e2e8f0;">'
+            + '<div style="font-size:0.7rem;color:#718096;font-weight:700;text-transform:uppercase;margin-bottom:0.3rem;">'+item[0]+'</div>'
+            + '<div style="font-weight:600;color:#1a202c;font-size:0.85rem;">'+item[1]+'</div>'
+            + '</div>';
     }).join('');
     var editBtn = document.getElementById('vuEditBtn');
     if (editBtn) editBtn.onclick = function(){ closeModal('viewUserModal'); editUser(userId); };
-    document.getElementById('viewUserModal').classList.add('active');
+    var modal = document.getElementById('viewUserModal');
+    if (modal) modal.classList.add('active');
 }
 
 function editUser(userId) {
     var users = window.users || [];
     var u = users.find(function(x){ return x.id === userId; });
     if (!u) return;
-    currentEditingUser = u;
-    document.getElementById('userModalTitle').textContent = 'Edit User';
+    var titleEl = document.getElementById('userModalTitle');
+    if (titleEl) titleEl.textContent = 'Edit User';
+    var iconEl = document.getElementById('userModalIcon');
+    if (iconEl) iconEl.innerHTML = '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>';
     var form = document.getElementById('addUserForm');
-    form.elements.name.value = u.name;
-    form.elements.username.value = u.username;
+    if (!form) return;
+    form.elements.name.value = u.name || '';
+    form.elements.username.value = u.username || '';
     form.elements.email.value = u.email || '';
-    form.elements.role.value = u.role;
-    form.elements.status.value = u.status;
+    form.elements.role.value = (u.role||'staff').toLowerCase();
+    var statusVal = (u.status||'active').toLowerCase();
+    form.elements.status.value = statusVal === 'active' ? 'Active' : 'Inactive';
     form.elements.password.value = '';
-    document.getElementById('userPasswordLabel').textContent = 'Password (leave blank to keep)';
-    document.getElementById('userPasswordInput').required = false;
-    document.getElementById('addUserModal').classList.add('active');
+    var pwLabel = document.getElementById('userPasswordLabel');
+    if (pwLabel) pwLabel.textContent = 'Password (leave blank to keep)';
+    var pwInput = document.getElementById('userPasswordInput');
+    if (pwInput) pwInput.required = false;
+    // Store editing ID for the submit handler
+    if (typeof window._editingUserId !== 'undefined') window._editingUserId = userId;
+    var modal = document.getElementById('addUserModal');
+    if (modal) modal.classList.add('active');
 }
 
 function toggleUserStatus(userId) {
     var users = window.users || [];
     var u = users.find(function(x){ return x.id === userId; });
     if (!u) return;
-    var action = u.status === 'active' ? 'deactivate' : 'activate';
-    if (confirm(action.charAt(0).toUpperCase()+action.slice(1)+' user "'+u.name+'"?')) {
-        u.status = u.status === 'active' ? 'inactive' : 'active';
-        renderUsersList();
-    }
+    var statusLower = (u.status||'active').toLowerCase();
+    var action = statusLower === 'active' ? 'deactivate' : 'activate';
+    if (!confirm(action.charAt(0).toUpperCase()+action.slice(1)+' user "'+u.name+'"?')) return;
+    var newStatus = statusLower === 'active' ? 'inactive' : 'active';
+    firebase.firestore().collection('users').doc(userId).update({ status: newStatus })
+        .then(function(){ showToast('User status updated!', 'success'); })
+        .catch(function(err){ showToast('Error: ' + err.message, 'error'); });
 }
-
-document.addEventListener('DOMContentLoaded', function() {
-    var addUserForm = document.getElementById('addUserForm');
-    if (addUserForm) {
-        addUserForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            var form = e.target;
-            var users = window.users || [];
-            var name = form.elements.name.value.trim();
-            var username = form.elements.username.value.trim();
-            var email = form.elements.email.value.trim();
-            var role = form.elements.role.value;
-            var status = form.elements.status.value;
-            var password = form.elements.password.value;
-
-            if (currentEditingUser) {
-                if (users.find(function(u){ return u.username===username && u.id!==currentEditingUser.id; })) {
-                    alert('⚠️ Username already taken.'); return;
-                }
-                var u = users.find(function(x){ return x.id===currentEditingUser.id; });
-                if (u) { u.name=name; u.username=username; u.email=email; u.role=role; u.status=status; if(password) u.password=password; }
-                alert('✅ User "'+name+'" updated!');
-            } else {
-                if (users.find(function(u){ return u.username===username; })) { alert('⚠️ Username already exists.'); return; }
-                if (!password) { alert('⚠️ Password is required.'); return; }
-                users.push({ id: nextUserId++, name:name, username:username, email:email, role:role, status:status, password:password, createdAt: new Date().toISOString().split('T')[0] });
-                window.users = users;
-                alert('✅ User "'+name+'" added!');
-            }
-            closeModal('addUserModal');
-            renderUsersList();
-        });
-    }
-});
 
 // ── Domains ─────────────────────────────────────────────────
 function renderDomainsList() {
@@ -1742,8 +1824,8 @@ function renderDomainsList() {
             + '<div><strong>' + d.name + '</strong></div>'
             + '<div style="display:flex;flex-wrap:wrap;gap:0.25rem;">' + chips + '</div>'
             + '<div style="display:flex;gap:0.3rem;">'
-            +   '<button class="btn-small btn-primary" onclick="editDomain(\'' + d.id + '\')" title="Edit">✏️</button>'
-            +   '<button class="btn-small btn-danger" onclick="deleteDomain(\'' + d.id + '\')" title="Delete">🗑️</button>'
+            +   '<button class="btn-small btn-primary" onclick="editDomain(\'' + d.id + '\')" title="Edit" style="display:inline-flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
+            +   '<button class="btn-small btn-danger" onclick="deleteDomain(\'' + d.id + '\')" title="Delete" style="display:inline-flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>'
             + '</div></div>';
     }).join('');
 }

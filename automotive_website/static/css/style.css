@@ -238,6 +238,14 @@ body {
     transform: translateX(-100%);
     transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
     box-shadow: 4px 0 24px rgba(0,0,0,0.12);
+    /* Hide scrollbar visually, keep scroll functional */
+    scrollbar-width: none;        /* Firefox */
+    -ms-overflow-style: none;     /* IE/Edge */
+}
+
+/* Hide scrollbar for Chrome/Safari/Opera */
+.admin-sidebar::-webkit-scrollbar {
+    display: none;
 }
 
 .admin-sidebar.admin-sidebar-open {
@@ -1724,4 +1732,186 @@ body {
         font-size: 0.82rem;
         padding: 0.5rem 0.85rem;
     }
+}
+
+
+/* ── Notification dropdown panel (shared: admin + customer) ── */
+.notif-dropdown-wrap {
+    position: relative;
+}
+
+.notif-panel {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    width: 340px;
+    max-height: 480px;
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.08);
+    border: 1px solid #e2e8f0;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: notifPanelIn 0.18s cubic-bezier(0.4,0,0.2,1);
+}
+
+@keyframes notifPanelIn {
+    from { opacity: 0; transform: translateY(-8px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0)   scale(1);    }
+}
+
+.notif-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.9rem 1.1rem 0.75rem;
+    border-bottom: 1px solid #f0f4f8;
+    flex-shrink: 0;
+}
+
+.notif-panel-title {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #1a202c;
+    flex: 1;
+}
+
+.notif-panel-count {
+    font-size: 0.72rem;
+    color: #a0aec0;
+    font-weight: 500;
+}
+
+.notif-panel-clear {
+    background: none;
+    border: none;
+    font-size: 0.72rem;
+    color: #E8001C;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
+    font-family: inherit;
+    transition: background 0.15s;
+}
+.notif-panel-clear:hover { background: #fff5f5; }
+
+.notif-panel-list {
+    overflow-y: auto;
+    flex: 1;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+.notif-panel-list::-webkit-scrollbar { display: none; }
+
+/* Arrow pointer on the panel */
+.notif-panel::before {
+    content: '';
+    position: absolute;
+    top: -7px;
+    right: 14px;
+    width: 13px;
+    height: 13px;
+    background: #fff;
+    border-left: 1px solid #e2e8f0;
+    border-top: 1px solid #e2e8f0;
+    transform: rotate(45deg);
+    border-radius: 2px 0 0 0;
+}
+
+@media (max-width: 480px) {
+    .notif-panel {
+        width: calc(100vw - 24px);
+        right: -8px;
+    }
+}
+
+
+/* ── Avatar dropdown menu (shared: admin + customer) ── */
+.avatar-menu {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    width: 220px;
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.08);
+    border: 1px solid #e2e8f0;
+    z-index: 9999;
+    overflow: hidden;
+    animation: notifPanelIn 0.18s cubic-bezier(0.4,0,0.2,1);
+}
+
+.avatar-menu::before {
+    content: '';
+    position: absolute;
+    top: -7px;
+    right: 12px;
+    width: 13px;
+    height: 13px;
+    background: #fff;
+    border-left: 1px solid #e2e8f0;
+    border-top: 1px solid #e2e8f0;
+    transform: rotate(45deg);
+    border-radius: 2px 0 0 0;
+}
+
+.avatar-menu-user {
+    padding: 0.9rem 1rem 0.75rem;
+}
+
+.avatar-menu-name {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #1a202c;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.avatar-menu-role {
+    font-size: 0.72rem;
+    color: #a0aec0;
+    font-weight: 500;
+    margin-top: 2px;
+}
+
+.avatar-menu-divider {
+    height: 1px;
+    background: #f0f4f8;
+    margin: 0;
+}
+
+.avatar-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.75rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #4a5568;
+    text-decoration: none;
+    background: none;
+    border: none;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s, color 0.15s;
+}
+
+.avatar-menu-item:hover {
+    background: #f7fafc;
+    color: #1a202c;
+}
+
+.avatar-menu-logout {
+    color: #E8001C;
+}
+
+.avatar-menu-logout:hover {
+    background: #fff5f5;
+    color: #E8001C;
 }

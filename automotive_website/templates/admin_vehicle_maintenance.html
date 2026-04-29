@@ -20,22 +20,48 @@
                 <div class="breadcrumb">Admin Portal › Vehicle Maintenance Management</div>
                 <div class="admin-header-title">Vehicle Maintenance</div>
             </div>
+            <div style="margin-left:auto;display:flex;gap:0.5rem;align-items:center;">
+                <div style="position:relative;display:flex;align-items:center;">
+                    <svg style="position:absolute;left:0.65rem;pointer-events:none;color:#a0aec0;" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input type="text" class="search-bar" placeholder="Search services..." id="serviceSearch" style="width:220px;padding-left:2rem;" oninput="renderServicesList()">
+                </div>
+
+            </div>
         </div>
 
         <div class="admin-content">
             <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:2rem;">
-                <div class="stat-card"><div class="stat-icon orange">📋</div><div class="stat-number" id="totalServices">0</div><div class="stat-label">Total Services</div></div>
-                <div class="stat-card"><div class="stat-icon blue">🔄</div><div class="stat-number" id="ongoingServices">0</div><div class="stat-label">Ongoing</div></div>
-                <div class="stat-card"><div class="stat-icon green">✅</div><div class="stat-number" id="completedServices">0</div><div class="stat-label">Completed</div></div>
-                <div class="stat-card"><div class="stat-icon red">⏳</div><div class="stat-number" id="pendingServices">0</div><div class="stat-label">Pending</div></div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background:rgba(0,48,135,0.10);color:#003087;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </div>
+                    <div class="stat-number" id="totalServices" style="color:#003087;">0</div>
+                    <div class="stat-label">Total Services</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon orange">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                    </div>
+                    <div class="stat-number" id="ongoingServices">0</div>
+                    <div class="stat-label">Ongoing</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon green">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    </div>
+                    <div class="stat-number" id="completedServices">0</div>
+                    <div class="stat-label">Completed</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background:rgba(113,128,150,0.10);color:#718096;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    </div>
+                    <div class="stat-number" id="pendingServices" style="color:#718096;">0</div>
+                    <div class="stat-label">Pending</div>
+                </div>
             </div>
 
             <div class="data-table">
-                <div class="table-actions" style="display:flex;justify-content:flex-end;gap:0.5rem;padding:0.75rem 1rem;border-bottom:1px solid #e2e8f0;">
-                    <input type="text" class="search-bar" placeholder="Search services..." id="serviceSearch">
-                    <button class="btn-icon btn-secondary"><span>📊</span> Export</button>
-                    <button class="btn-icon btn-primary" onclick="openAddServiceModal()"><span>➕</span> New Service</button>
-                </div>
                 <div class="table-row" style="background:#f7fafc;font-weight:bold;border-bottom:2px solid #e2e8f0;grid-template-columns:1fr 1fr 1.5fr 1fr 1fr 1fr 160px;">
                     <div>Date Serviced</div><div>Plate Number</div><div>Description</div>
                     <div>Mechanic Name</div><div>Total Cost</div><div>Status</div><div>Actions</div>
@@ -45,6 +71,121 @@
         </div>
     </div>
     </div><!-- /.admin-dashboard-body -->
+</div>
+
+<!-- Floating Add Button -->
+<button onclick="svcOpenAddModal()" style="position:fixed;bottom:2rem;right:2rem;width:56px;height:56px;border-radius:50%;background:#E31E24;border:none;color:white;cursor:pointer;box-shadow:0 4px 16px rgba(227,30,36,0.4);display:flex;align-items:center;justify-content:center;z-index:9999;transition:transform 0.2s,box-shadow 0.2s;" onmouseover="this.style.transform='scale(1.1)';this.style.boxShadow='0 6px 24px rgba(227,30,36,0.5)'" onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 4px 16px rgba(227,30,36,0.4)'">
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+</button>
+
+<!-- ── View Service Modal ── -->
+<div class="modal" id="svcDetailsModal">
+    <div class="modal-content" style="max-width:540px;padding:0;border-radius:20px;overflow:hidden;display:flex;flex-direction:column;max-height:90vh;">
+        <!-- Header -->
+        <div style="background:linear-gradient(135deg,#E31E24,#C41E3A);padding:1.25rem 1.5rem;display:flex;align-items:center;gap:0.85rem;flex-shrink:0;">
+            <div style="background:rgba(255,255,255,0.2);width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+            </div>
+            <div style="flex:1;">
+                <div id="svcDetailPlate" style="color:white;font-size:1rem;font-weight:700;"></div>
+                <div id="svcDetailDesc" style="color:rgba(255,255,255,0.75);font-size:0.78rem;margin-top:0.1rem;"></div>
+            </div>
+            <button onclick="closeModal('svcDetailsModal')" style="background:rgba(255,255,255,0.2);border:none;color:white;width:32px;height:32px;border-radius:50%;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;">&times;</button>
+        </div>
+        <!-- Body -->
+        <div style="padding:1.25rem 1.5rem;overflow-y:auto;flex:1;background:#f8fafc;display:flex;flex-direction:column;gap:0.75rem;">
+            <!-- Info rows -->
+            <div style="background:white;border-radius:14px;padding:1rem 1.25rem;border:1px solid #e2e8f0;" id="svcDetailRows"></div>
+            <!-- Services Rendered -->
+            <div id="svcDetailSvcSection" style="display:none;">
+                <div style="font-size:0.75rem;font-weight:700;color:#4a5568;text-transform:uppercase;margin-bottom:0.5rem;letter-spacing:0.05em;">Services Rendered</div>
+                <div id="svcDetailSvcRows" style="display:flex;flex-direction:column;gap:0.5rem;"></div>
+            </div>
+            <!-- Materials Used -->
+            <div id="svcDetailMatSection" style="display:none;">
+                <div style="font-size:0.75rem;font-weight:700;color:#4a5568;text-transform:uppercase;margin-bottom:0.5rem;letter-spacing:0.05em;">Materials Used</div>
+                <div id="svcDetailMatRows" style="display:flex;flex-direction:column;gap:0.5rem;"></div>
+            </div>
+        </div>
+        <!-- Footer actions -->
+        <div style="padding:1rem 1.5rem;background:white;border-top:1px solid #e2e8f0;display:flex;gap:0.75rem;flex-shrink:0;">
+            <button id="svcDetailApproveBtn" style="display:none;flex:1;padding:0.75rem;background:#d69e2e;border:none;border-radius:10px;color:white;font-weight:700;cursor:pointer;font-size:0.88rem;align-items:center;justify-content:center;gap:0.4rem;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                Approve — Ongoing
+            </button>
+            <button id="svcDetailCompleteBtn" style="display:none;flex:1;padding:0.75rem;background:#38a169;border:none;border-radius:10px;color:white;font-weight:700;cursor:pointer;font-size:0.88rem;align-items:center;justify-content:center;gap:0.4rem;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/><polyline points="20 6 9 17 4 12"/><path d="M4 12l5 5L20 6"/><path d="M9 17l-5-5"/></svg>
+                Mark as Completed
+            </button>
+            <button id="svcDetailEditBtn" style="display:none;flex:1;padding:0.75rem;background:linear-gradient(135deg,#E31E24,#C41E3A);border:none;border-radius:10px;color:white;font-weight:700;cursor:pointer;font-size:0.88rem;align-items:center;justify-content:center;gap:0.4rem;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                Edit
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Add / Edit Service Modal ── -->
+<div class="modal" id="svcAddModal">
+    <div class="modal-content" style="max-width:600px;padding:0;border-radius:20px;overflow:hidden;display:flex;flex-direction:column;max-height:92vh;">
+        <div style="background:linear-gradient(135deg,#E31E24,#C41E3A);padding:1.25rem 1.5rem;display:flex;align-items:center;gap:0.85rem;flex-shrink:0;">
+            <div id="svcModalIconWrap" style="background:rgba(255,255,255,0.2);width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <svg id="svcModalIcon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </div>
+            <div style="flex:1;"><div id="svcModalTitle" style="color:white;font-size:1rem;font-weight:700;">New Service</div></div>
+            <button onclick="closeModal('svcAddModal')" style="background:rgba(255,255,255,0.2);border:none;color:white;width:32px;height:32px;border-radius:50%;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;">&times;</button>
+        </div>
+        <div style="padding:1.25rem 1.5rem;overflow-y:auto;flex:1;background:#f8fafc;display:flex;flex-direction:column;gap:0.85rem;">
+            <div class="form-group" style="margin:0;">
+                <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Plate Number *</label>
+                <div style="position:relative;margin-top:0.3rem;">
+                    <svg style="position:absolute;left:0.65rem;top:50%;transform:translateY(-50%);pointer-events:none;color:#a0aec0;" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input type="text" id="svcPlateInput" placeholder="Search or type plate number..." autocomplete="off"
+                        style="width:100%;padding:0.55rem 0.75rem 0.55rem 2.1rem;border:1px solid #e2e8f0;border-radius:8px;font-size:0.83rem;box-sizing:border-box;text-transform:uppercase;"
+                        oninput="svcPlateLookup(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();}">
+                    <input type="hidden" id="svcPlateSelect" value="">
+                </div>
+                <div id="svcPlateSuggestions" style="display:none;background:white;border:1px solid #e2e8f0;border-radius:8px;margin-top:2px;max-height:180px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.08);z-index:100;position:relative;"></div>
+            </div>
+            <div id="svcVehicleInfo" style="display:none;background:white;border-radius:10px;padding:0.75rem 1rem;border:1px solid #e2e8f0;font-size:0.83rem;color:#4a5568;align-items:center;gap:0.6rem;"></div>
+            <div class="form-group" style="margin:0;">
+                <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Mechanic Name *</label>
+                <input type="text" id="svcMechanic" placeholder="e.g. Juan Dela Cruz" style="margin-top:0.3rem;">
+            </div>
+            <div class="form-group" style="margin:0;">
+                <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Date Serviced *</label>
+                <input type="date" id="svcDate" style="margin-top:0.3rem;">
+            </div>
+            <!-- Services Rendered -->
+            <div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+                    <span style="font-size:0.85rem;font-weight:700;color:#4a5568;">Services Rendered</span>
+                    <button type="button" onclick="svcAddSvcRow()" style="background:none;border:none;color:#E31E24;font-size:0.82rem;cursor:pointer;font-weight:600;">+ Add Row</button>
+                </div>
+                <div id="svcSvcRows"></div>
+            </div>
+            <!-- Materials Used -->
+            <div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+                    <span style="font-size:0.85rem;font-weight:700;color:#4a5568;">Materials Used</span>
+                    <button type="button" onclick="svcAddMatRow()" style="background:none;border:none;color:#E31E24;font-size:0.82rem;cursor:pointer;font-weight:600;">+ Add Row</button>
+                </div>
+                <div id="svcMatRows"></div>
+            </div>
+            <!-- Total -->
+            <div style="background:white;border-radius:10px;padding:0.85rem 1rem;border:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-size:0.88rem;font-weight:600;color:#2c5282;">Total Cost</span>
+                <span id="svcTotalDisplay" style="font-size:1.2rem;font-weight:800;color:#2b6cb0;">₱0.00</span>
+            </div>
+        </div>
+        <div style="padding:1rem 1.5rem;background:white;border-top:1px solid #e2e8f0;display:flex;gap:0.75rem;flex-shrink:0;">
+            <button type="button" class="btn-secondary" style="flex:1;" onclick="closeModal('svcAddModal')">Cancel</button>
+            <button type="button" class="btn-primary" style="flex:1;display:flex;align-items:center;justify-content:center;gap:0.4rem;" id="svcSubmitBtn" onclick="svcSave()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                Save
+            </button>
+        </div>
+    </div>
 </div>
 
 <div id="toast"></div>
@@ -72,5 +213,528 @@
 <script src="../static/js/admin_functions.js"></script>
 <script src="../static/js/admin.js"></script>
 <script src="../static/js/admin_sidebar.js"></script>
-</body>
+<script>
+var _svcEditingId = null;
+var _svcServiceItems = [];
+var _svcMaterialItems = [];
+var _svcVehicles = [];
+
+// Populate vehicle dropdown and item lists from Firebase data
+document.addEventListener('DOMContentLoaded', function() {
+  setTimeout(function() {
+    // Vehicles
+    _svcVehicles = window._fbVehicles || window.assets || [];
+    // Item master
+    var master = window.itemMaster || [];
+    _svcServiceItems = master.filter(function(i){ return i.itemType === 'Service'; });
+    _svcMaterialItems = master.filter(function(i){ return i.itemType === 'Material'; });
+  }, 1500);
+});
+
+function svcPlateLookup(input) {
+  var q = input.value.trim().toUpperCase();
+  var suggestions = document.getElementById('svcPlateSuggestions');
+  var hidden = document.getElementById('svcPlateSelect');
+  var info = document.getElementById('svcVehicleInfo');
+
+  // Clear selected value when user types
+  hidden.value = '';
+  info.style.display = 'none';
+
+  if (!q) { suggestions.style.display = 'none'; return; }
+
+  var matches = _svcVehicles.filter(function(v) {
+    var plate = (v.plate || v.plateNumber || '').toUpperCase();
+    var desc = (v.desc || v.assetDescription || '').toUpperCase();
+    return plate.includes(q) || desc.includes(q);
+  });
+
+  if (matches.length === 0) { suggestions.style.display = 'none'; return; }
+
+  suggestions.innerHTML = matches.map(function(v) {
+    var plate = v.plate || v.plateNumber || '';
+    var desc = v.desc || v.assetDescription || '';
+    var owner = v.owner || '';
+    return '<div style="padding:0.6rem 0.85rem;cursor:pointer;border-bottom:1px solid #f0f4f8;display:flex;align-items:center;gap:0.6rem;" '
+      + 'onmousedown="event.preventDefault();svcPlateSelect(\'' + plate.replace(/'/g,"\\'") + '\');">'
+      + '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#003087" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>'
+      + '<div>'
+      + '<div style="font-weight:700;font-size:0.85rem;color:#1a202c;">' + plate + '</div>'
+      + (desc ? '<div style="font-size:0.75rem;color:#718096;">' + desc + (owner ? ' • ' + owner : '') + '</div>' : '')
+      + '</div>'
+      + '</div>';
+  }).join('');
+  suggestions.style.display = 'block';
+}
+
+function svcPlateSelect(plate) {
+  var v = _svcVehicles.find(function(x){ return (x.plate || x.plateNumber) === plate; });
+  document.getElementById('svcPlateInput').value = plate;
+  document.getElementById('svcPlateSelect').value = plate;
+  document.getElementById('svcPlateSuggestions').style.display = 'none';
+  var info = document.getElementById('svcVehicleInfo');
+  if (v) {
+    info.style.display = 'flex';
+    info.style.alignItems = 'center';
+    info.style.gap = '0.6rem';
+    info.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E31E24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>'
+      + '<div><div style="font-weight:600;font-size:0.85rem;color:#1a202c;">' + (v.desc || v.assetDescription || plate) + '</div>'
+      + (v.owner ? '<div style="font-size:0.75rem;color:#718096;">' + v.owner + '</div>' : '')
+      + '</div>';
+  } else {
+    info.style.display = 'none';
+  }
+}
+
+// Keep backward compat for editService which calls svcOnPlateChange
+function svcOnPlateChange(sel) { svcPlateSelect(sel.value || sel); }
+
+function svcParseToInputDate(dateStr) {
+  if (!dateStr) return '';
+  // Try parsing common formats: "Jan 5, 2025", "1/5/2025", "2025-01-05"
+  var d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  var y = d.getFullYear();
+  var m = String(d.getMonth() + 1).padStart(2, '0');
+  var day = String(d.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + day;
+}
+
+function svcCalcTotal() {
+  var total = 0;
+  document.querySelectorAll('#svcSvcRows .svc-row, #svcMatRows .svc-row').forEach(function(row) {
+    var qty = parseFloat((row.querySelector('.svc-row-qty') || {}).value) || 0;
+    var cost = parseFloat((row.querySelector('.svc-row-cost') || {}).value) || 0;
+    total += qty * cost;
+  });
+  document.getElementById('svcTotalDisplay').textContent = '₱' + total.toLocaleString('en-PH', {minimumFractionDigits:2});
+  return total;
+}
+
+function svcAddSvcRow(name, qty, uom, cost) {
+  var opts = _svcServiceItems.map(function(i){ return '<option value="' + i.itemName + '">' + i.itemName + '</option>'; }).join('');
+  var div = document.createElement('div');
+  div.className = 'svc-row';
+  div.style.cssText = 'margin-bottom:0.6rem;';
+  div.innerHTML =
+    '<div style="display:flex;gap:0.4rem;align-items:center;">'
+    + '<select class="svc-row-name" style="flex:1;padding:0.55rem 0.75rem;border:1px solid #e2e8f0;border-radius:8px;font-size:0.83rem;background:white;" onchange="svcOnSvcSelect(this)">'
+    + '<option value="">Select service...</option>' + opts
+    + '</select>'
+    + '<button type="button" onclick="this.closest(\'.svc-row\').remove();svcCalcTotal();" style="width:30px;height:30px;background:none;border:none;color:#e53e3e;cursor:pointer;font-size:1.1rem;flex-shrink:0;display:flex;align-items:center;justify-content:center;">✕</button>'
+    + '</div>'
+    + '<div class="svc-row-detail" style="display:none;margin-top:0.4rem;background:#ebf8ff;border-radius:8px;padding:0.65rem 0.85rem;border:1px solid #90cdf4;">'
+    + '<div style="font-size:0.75rem;color:#718096;" class="svc-row-meta"></div>'
+    + '<div style="margin-top:0.5rem;">'
+    + '<label style="font-size:0.75rem;font-weight:600;color:#4a5568;">Quantity *</label>'
+    + '<input type="number" class="svc-row-qty" min="1" value="' + (qty||1) + '" style="width:100%;margin-top:0.2rem;padding:0.45rem 0.65rem;border:1px solid #bee3f8;border-radius:6px;font-size:0.83rem;" oninput="svcCalcTotal()">'
+    + '</div>'
+    + '<input type="hidden" class="svc-row-uom" value="' + (uom||'') + '">'
+    + '<input type="hidden" class="svc-row-cost" value="' + (cost||'') + '">'
+    + '</div>';
+  document.getElementById('svcSvcRows').appendChild(div);
+  if (name) {
+    div.querySelector('.svc-row-name').value = name;
+    svcOnSvcSelect(div.querySelector('.svc-row-name'), qty, uom, cost);
+  }
+}
+
+function svcOnSvcSelect(sel, preQty, preUom, preCost) {
+  var row = sel.closest('.svc-row');
+  var detail = row.querySelector('.svc-row-detail');
+  var item = _svcServiceItems.find(function(i){ return i.itemName === sel.value; });
+  if (item || (preUom && preCost)) {
+    var uom = (item && item.uom) || preUom || 'job';
+    var cost = parseFloat((item && item.cost) || preCost || 0);
+    row.querySelector('.svc-row-uom').value = uom;
+    row.querySelector('.svc-row-cost').value = cost;
+    if (!row.querySelector('.svc-row-qty').value) row.querySelector('.svc-row-qty').value = preQty || 1;
+    row.querySelector('.svc-row-meta').textContent = 'UOM: ' + uom + '  •  Unit Cost: ₱' + cost.toLocaleString('en-PH', {minimumFractionDigits:2});
+    detail.style.display = 'block';
+    svcCalcTotal();
+  } else {
+    detail.style.display = 'none';
+    row.querySelector('.svc-row-uom').value = '';
+    row.querySelector('.svc-row-cost').value = '';
+    svcCalcTotal();
+  }
+}
+
+function svcAddMatRow(name, qty, uom, cost) {
+  var div = document.createElement('div');
+  div.className = 'svc-row';
+  div.style.cssText = 'margin-bottom:0.6rem;';
+  div.innerHTML =
+    '<div style="display:flex;gap:0.4rem;align-items:center;">'
+    + '<div style="flex:1;position:relative;">'
+    + '<input type="text" class="svc-mat-search" placeholder="Search or type material name..." autocomplete="off"'
+    + ' style="width:100%;padding:0.55rem 2.2rem 0.55rem 0.75rem;border:1px solid #e2e8f0;border-radius:8px;font-size:0.83rem;box-sizing:border-box;"'
+    + ' oninput="svcMatLookup(this)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();svcMatLookup(this,true);}">'
+    + '<button type="button" onclick="svcMatLookup(this.previousElementSibling,true)" title="Search" style="position:absolute;right:0.4rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#718096;padding:0;display:flex;align-items:center;justify-content:center;"><svg xmlns=\'http://www.w3.org/2000/svg\' width=\'15\' height=\'15\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'currentColor\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><circle cx=\'11\' cy=\'11\' r=\'8\'/><line x1=\'21\' y1=\'21\' x2=\'16.65\' y2=\'16.65\'/></svg></button>'
+    + '</div>'
+    + '<button type="button" onclick="this.closest(\'.svc-row\').remove();svcCalcTotal();" style="width:30px;height:30px;background:none;border:none;color:#e53e3e;cursor:pointer;font-size:1.1rem;flex-shrink:0;display:flex;align-items:center;justify-content:center;">✕</button>'
+    + '</div>'
+    + '<div class="svc-mat-suggestions" style="display:none;background:white;border:1px solid #e2e8f0;border-radius:8px;margin-top:2px;max-height:160px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.08);"></div>'
+    + '<div class="svc-row-detail" style="display:none;margin-top:0.4rem;background:#ebf8ff;border-radius:8px;padding:0.65rem 0.85rem;border:1px solid #90cdf4;">'
+    + '<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
+    + '<div>'
+    + '<div class="svc-mat-name-display" style="font-weight:600;font-size:0.85rem;color:#1a202c;"></div>'
+    + '<div style="font-size:0.75rem;color:#718096;margin-top:2px;" class="svc-row-meta"></div>'
+    + '</div>'
+    + '<button type="button" onclick="svcMatClear(this)" style="background:none;border:none;color:#718096;cursor:pointer;font-size:0.8rem;padding:0;">✕ Clear</button>'
+    + '</div>'
+    + '<div class="svc-mat-stock" style="font-size:0.75rem;font-weight:600;margin-top:4px;"></div>'
+    + '<div style="margin-top:0.5rem;">'
+    + '<label class="svc-mat-qty-label" style="font-size:0.75rem;font-weight:600;color:#4a5568;">Quantity *</label>'
+    + '<input type="number" class="svc-row-qty" min="1" value="' + (qty||1) + '" style="width:100%;margin-top:0.2rem;padding:0.45rem 0.65rem;border:1px solid #bee3f8;border-radius:6px;font-size:0.83rem;" oninput="svcMatQtyCheck(this)">'
+    + '</div>'
+    + '<input type="hidden" class="svc-row-name" value="">'
+    + '<input type="hidden" class="svc-row-uom" value="' + (uom||'') + '">'
+    + '<input type="hidden" class="svc-row-cost" value="' + (cost||'') + '">'
+    + '<input type="hidden" class="svc-mat-max" value="99999">'
+    + '</div>';
+  document.getElementById('svcMatRows').appendChild(div);
+  if (name) {
+    div.querySelector('.svc-mat-search').value = name;
+    svcMatApply(div, name, uom, cost, null);
+  }
+}
+
+function svcMatLookup(input, exact) {
+  var row = input.closest('.svc-row');
+  var q = input.value.trim().toLowerCase();
+  var suggestions = row.querySelector('.svc-mat-suggestions');
+  if (!q) { suggestions.style.display = 'none'; return; }
+
+  var matches = _svcMaterialItems.filter(function(i){
+    return i.itemName.toLowerCase().includes(q);
+  });
+
+  if (exact && matches.length === 1) {
+    suggestions.style.display = 'none';
+    svcMatApply(row, matches[0].itemName, matches[0].uom, matches[0].cost, null);
+    return;
+  }
+  if (exact && matches.length === 0) return;
+
+  if (matches.length === 0) { suggestions.style.display = 'none'; return; }
+
+  suggestions.innerHTML = matches.map(function(i){
+    return '<div style="padding:0.5rem 0.75rem;cursor:pointer;font-size:0.83rem;border-bottom:1px solid #f0f4f8;" '
+      + 'onmousedown="event.preventDefault();svcMatApply(this.closest(\'.svc-row\'),\'' + i.itemName.replace(/'/g,"\\'") + '\',\'' + (i.uom||'').replace(/'/g,"\\'") + '\',\'' + (i.cost||'0') + '\',null);this.closest(\'.svc-mat-suggestions\').style.display=\'none\';">'
+      + '<strong>' + i.itemName + '</strong>'
+      + '<span style="color:#718096;font-size:0.75rem;margin-left:0.5rem;">' + (i.uom||'') + ' • ₱' + parseFloat(i.cost||0).toLocaleString('en-PH',{minimumFractionDigits:2}) + '</span>'
+      + '</div>';
+  }).join('');
+  suggestions.style.display = 'block';
+}
+
+function svcMatApply(row, name, uom, cost, maxStock) {
+  var costNum = parseFloat(cost) || 0;
+  row.querySelector('.svc-mat-search').value = name;
+  row.querySelector('.svc-row-name').value = name;
+  row.querySelector('.svc-row-uom').value = uom || '';
+  row.querySelector('.svc-row-cost').value = costNum;
+  row.querySelector('.svc-mat-name-display').textContent = name;
+  row.querySelector('.svc-row-meta').textContent = 'UOM: ' + (uom||'—') + '  •  Unit Cost: ₱' + costNum.toLocaleString('en-PH',{minimumFractionDigits:2});
+  row.querySelector('.svc-mat-suggestions').style.display = 'none';
+
+  // Fetch stock
+  firebase.firestore().collection('stock_inventory').where('name','==',name).limit(1).get().then(function(snap){
+    var available = snap.empty ? 99999 : ((snap.docs[0].data().stock || 0));
+    row.querySelector('.svc-mat-max').value = available;
+    var stockEl = row.querySelector('.svc-mat-stock');
+    if (available === 99999) {
+      stockEl.textContent = '';
+    } else if (available === 0) {
+      stockEl.style.color = '#e53e3e';
+      stockEl.textContent = '⚠ Out of stock';
+    } else if (available <= 5) {
+      stockEl.style.color = '#d69e2e';
+      stockEl.textContent = 'Available stock: ' + available;
+    } else {
+      stockEl.style.color = '#38a169';
+      stockEl.textContent = 'Available stock: ' + available;
+    }
+    var qtyLabel = row.querySelector('.svc-mat-qty-label');
+    qtyLabel.textContent = available === 99999 ? 'Quantity *' : 'Quantity * (max ' + available + ')';
+    var qtyInput = row.querySelector('.svc-row-qty');
+    qtyInput.disabled = available === 0;
+    if (maxStock === null && available !== 99999) {
+      var cur = parseInt(qtyInput.value) || 1;
+      if (cur > available) qtyInput.value = available;
+    }
+    svcCalcTotal();
+  });
+
+  row.querySelector('.svc-row-detail').style.display = 'block';
+  if (!row.querySelector('.svc-row-qty').value) row.querySelector('.svc-row-qty').value = 1;
+  svcCalcTotal();
+}
+
+function svcMatQtyCheck(input) {
+  var row = input.closest('.svc-row');
+  var max = parseInt(row.querySelector('.svc-mat-max').value) || 99999;
+  if (max < 99999 && parseInt(input.value) > max) input.value = max;
+  svcCalcTotal();
+}
+
+function svcMatClear(btn) {
+  var row = btn.closest('.svc-row');
+  row.querySelector('.svc-mat-search').value = '';
+  row.querySelector('.svc-row-name').value = '';
+  row.querySelector('.svc-row-uom').value = '';
+  row.querySelector('.svc-row-cost').value = '';
+  row.querySelector('.svc-row-detail').style.display = 'none';
+  svcCalcTotal();
+}
+
+function svcOpenAddModal() {
+  window._svcEditingId = null;
+  _svcEditingId = null;
+  document.getElementById('svcModalTitle').textContent = 'New Service';
+  document.getElementById('svcSubmitBtn').innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save';
+  document.getElementById('svcModalIcon').innerHTML = '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>';
+  document.getElementById('svcPlateInput').value = '';
+  document.getElementById('svcPlateSelect').value = '';
+  document.getElementById('svcPlateSuggestions').style.display = 'none';
+  document.getElementById('svcVehicleInfo').style.display = 'none';
+  document.getElementById('svcMechanic').value = '';
+  document.getElementById('svcDate').value = '';
+  document.getElementById('svcSvcRows').innerHTML = '';
+  document.getElementById('svcMatRows').innerHTML = '';
+  document.getElementById('svcTotalDisplay').textContent = '₱0.00';
+  svcAddSvcRow(); svcAddMatRow();
+  document.getElementById('svcAddModal').classList.add('active');
+}
+
+function openAddServiceModal() { svcOpenAddModal(); }
+
+// Close plate suggestions on outside click
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('#svcPlateInput') && !e.target.closest('#svcPlateSuggestions')) {
+    var s = document.getElementById('svcPlateSuggestions');
+    if (s) s.style.display = 'none';
+  }
+});
+
+function viewServiceDetails(docId) {
+  window._svcViewDetails(docId);
+}
+window._svcViewDetails = function(docId) {
+  var db = firebase.firestore();
+  db.collection('maintenance').doc(docId).get().then(function(doc) {
+    if (!doc.exists) return;
+    var s = doc.data();
+    s._docId = doc.id;
+
+    var statusLower = (s.status || '').toLowerCase();
+    var sc = { 'completed':'#38a169', 'ongoing':'#d69e2e', 'pending':'#718096' };
+    var color = sc[statusLower] || '#718096';
+
+    document.getElementById('svcDetailPlate').textContent = s.plate || '—';
+    document.getElementById('svcDetailDesc').textContent = s.desc || '—';
+
+    // Info rows
+    var rows = [
+      ['Plate Number', s.plate || '—'],
+      ['Mechanic', s.mechanic || '—'],
+      ['Date Serviced', s.date || '—'],
+      ['Total Cost', s.cost || '₱0.00'],
+      ['Status', '<span style="display:inline-block;padding:2px 10px;border-radius:20px;background:' + color + '1a;color:' + color + ';font-weight:700;font-size:0.82rem;">' + (s.status || '—') + '</span>'],
+    ];
+    document.getElementById('svcDetailRows').innerHTML = rows.map(function(r, i) {
+      var isLast = i === rows.length - 1;
+      return '<div style="display:flex;align-items:center;padding:0.55rem 0;' + (!isLast ? 'border-bottom:1px solid #f0f4f8;' : '') + '">'
+        + '<span style="width:130px;flex-shrink:0;font-size:0.78rem;color:#718096;font-weight:500;">' + r[0] + '</span>'
+        + '<span style="font-size:0.85rem;font-weight:600;color:#1a202c;flex:1;">' + r[1] + '</span>'
+        + '</div>';
+    }).join('');
+
+    // Services Rendered (svcRows)
+    var svcSec = document.getElementById('svcDetailSvcSection');
+    var svcRowsEl = document.getElementById('svcDetailSvcRows');
+    var svcRows = (s.svcRows || []).filter(function(r){ return r.name; });
+    if (svcRows.length > 0) {
+      svcSec.style.display = 'block';
+      svcRowsEl.innerHTML = svcRows.map(function(r) {
+        var qty = parseFloat(r.qty) || 1;
+        var cost = parseFloat(r.cost) || 0;
+        var subtotal = qty * cost;
+        return '<div style="background:#ebf8ff;border-radius:10px;padding:0.75rem 1rem;border:1px solid #90cdf4;display:flex;justify-content:space-between;align-items:center;">'
+          + '<div style="display:flex;align-items:center;gap:0.6rem;">'
+          + '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#003087" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>'
+          + '<div><div style="font-weight:600;font-size:13px;color:#1a202c;">' + (r.name || '—') + '</div>'
+          + '<div style="font-size:11px;color:#718096;">' + qty + ' ' + (r.uom || '') + ' &nbsp;•&nbsp; ₱' + cost.toLocaleString('en-PH',{minimumFractionDigits:2}) + '/unit</div></div>'
+          + '</div>'
+          + '<span style="font-weight:700;font-size:13px;color:#1a202c;">₱' + subtotal.toLocaleString('en-PH',{minimumFractionDigits:2}) + '</span>'
+          + '</div>';
+      }).join('');
+    } else { svcSec.style.display = 'none'; }
+
+    // Materials Used (matRows)
+    var matSec = document.getElementById('svcDetailMatSection');
+    var matRowsEl = document.getElementById('svcDetailMatRows');
+    var matRows = (s.matRows || []).filter(function(r){ return r.name; });
+    if (matRows.length > 0) {
+      matSec.style.display = 'block';
+      matRowsEl.innerHTML = matRows.map(function(r) {
+        var qty = parseFloat(r.qty) || 1;
+        var cost = parseFloat(r.cost) || 0;
+        var subtotal = qty * cost;
+        return '<div style="background:#F0F4FF;border-radius:10px;padding:0.75rem 1rem;border:1px solid #bee3f8;display:flex;justify-content:space-between;align-items:center;">'
+          + '<div style="display:flex;align-items:center;gap:0.6rem;">'
+          + '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#E31E24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>'
+          + '<div><div style="font-weight:600;font-size:13px;color:#1a202c;">' + (r.name || '—') + '</div>'
+          + '<div style="font-size:11px;color:#718096;">' + qty + ' ' + (r.uom || '') + ' &nbsp;•&nbsp; ₱' + cost.toLocaleString('en-PH',{minimumFractionDigits:2}) + '/unit</div></div>'
+          + '</div>'
+          + '<span style="font-weight:700;font-size:13px;color:#1a202c;">₱' + subtotal.toLocaleString('en-PH',{minimumFractionDigits:2}) + '</span>'
+          + '</div>';
+      }).join('');
+    } else { matSec.style.display = 'none'; }
+
+    // Action buttons — mirror mobile logic
+    var approveBtn = document.getElementById('svcDetailApproveBtn');
+    var completeBtn = document.getElementById('svcDetailCompleteBtn');
+    var editBtn = document.getElementById('svcDetailEditBtn');
+    approveBtn.style.display = statusLower === 'pending' ? 'flex' : 'none';
+    completeBtn.style.display = statusLower === 'ongoing' ? 'flex' : 'none';
+    editBtn.style.display = statusLower !== 'completed' ? 'flex' : 'none';
+
+    approveBtn.onclick = function() {
+      if (!confirm('Approve service for ' + s.plate + ' and set status to Ongoing?')) return;
+      db.collection('maintenance').doc(docId).update({ status: 'Ongoing' }).then(function() {
+        // Update vehicle status to Under Maintenance
+        db.collection('vehicles').where('plate', '==', (s.plate||'').trim().toUpperCase()).limit(1).get().then(function(vSnap) {
+          if (!vSnap.empty) vSnap.docs[0].ref.update({ status: 'Under Maintenance' });
+        });
+        closeModal('svcDetailsModal');
+        showToast('Service approved — status set to Ongoing!', 'success');
+      }).catch(function(err) { showToast('Error: ' + err.message, 'error'); });
+    };
+
+    completeBtn.onclick = function() {
+      if (!confirm('Mark service for ' + s.plate + ' as Completed?')) return;
+      db.collection('maintenance').doc(docId).update({ status: 'Completed' }).then(function() {
+        var now = new Date();
+        var dateStr = (now.getMonth()+1) + '/' + now.getDate() + '/' + now.getFullYear();
+        var plate = (s.plate || '').trim().toUpperCase();
+        var matRows = s.matRows || [];
+        var svcRows = s.svcRows || [];
+        var batch = db.batch();
+
+        // Auto-create issuances + deduct stock for materials
+        var matPromises = matRows.filter(function(r){ return r.name; }).map(function(r) {
+          var qty = parseInt(r.qty) || 1;
+          var cost = parseFloat(r.cost) || 0;
+          return db.collection('item_master').where('name', '==', r.name).limit(1).get().then(function(iSnap) {
+            var iData = iSnap.empty ? {} : iSnap.docs[0].data();
+            db.collection('issuances').add({
+              id: 'ISS-AUTO-' + Date.now(),
+              date: dateStr, plate: plate, assetDesc: s.desc || '',
+              itemNum: iData.num || '', itemName: r.name, itemType: 'Material',
+              commodityGroup: iData.group || '', uom: r.uom || '',
+              qty: '' + qty, unitCost: cost.toFixed(2), subtotal: (cost * qty).toFixed(2),
+              createdBy: 'Admin', maintenanceId: s.id || docId,
+              createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            });
+            // Deduct stock
+            return db.collection('stock_inventory').where('name', '==', r.name).limit(1).get().then(function(stSnap) {
+              if (!stSnap.empty) {
+                var stDoc = stSnap.docs[0];
+                var cur = (stDoc.data().stock || 0);
+                var newStock = Math.max(0, cur - qty);
+                var minLevel = stDoc.data().min || 0;
+                stDoc.ref.update({ stock: newStock, status: newStock >= minLevel ? 'OK' : 'Low', updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+              }
+              // Log OUT transaction
+              db.collection('transactions').add({
+                item: r.name, desc: 'Issued for maintenance ' + (s.id || docId) + ' — ' + plate,
+                type: 'OUT', qty: '-' + qty, date: dateStr, by: 'Admin',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+              });
+            });
+          });
+        });
+
+        // Issuances for service rows
+        var svcPromises = svcRows.filter(function(r){ return r.name; }).map(function(r) {
+          var qty = parseInt(r.qty) || 1;
+          var cost = parseFloat(r.cost) || 0;
+          return db.collection('item_master').where('name', '==', r.name).limit(1).get().then(function(iSnap) {
+            var iData = iSnap.empty ? {} : iSnap.docs[0].data();
+            return db.collection('issuances').add({
+              id: 'ISS-AUTO-' + Date.now() + '-S',
+              date: dateStr, plate: plate, assetDesc: s.desc || '',
+              itemNum: iData.num || '', itemName: r.name, itemType: 'Service',
+              commodityGroup: iData.group || '', uom: r.uom || '',
+              qty: '' + qty, unitCost: cost.toFixed(2), subtotal: (cost * qty).toFixed(2),
+              createdBy: 'Admin', maintenanceId: s.id || docId,
+              createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            });
+          });
+        });
+
+        Promise.all(matPromises.concat(svcPromises)).then(function() {
+          // Update vehicle status + last service date
+          var lastSvcDate = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+          db.collection('vehicles').where('plate', '==', plate).limit(1).get().then(function(vSnap) {
+            if (!vSnap.empty) vSnap.docs[0].ref.update({ status: 'Completed', completedAt: firebase.firestore.FieldValue.serverTimestamp(), lastSvcDate: lastSvcDate });
+          });
+          closeModal('svcDetailsModal');
+          showToast('Service marked as Completed!', 'success');
+        });
+      }).catch(function(err) { showToast('Error: ' + err.message, 'error'); });
+    };
+
+    editBtn.onclick = function() { closeModal('svcDetailsModal'); editService(docId); };
+
+    document.getElementById('svcDetailsModal').classList.add('active');
+  });
+}
+
+function svcSave() {
+  var plate = document.getElementById('svcPlateSelect').value;
+  var mechanic = document.getElementById('svcMechanic').value.trim();
+  var date = document.getElementById('svcDate').value;
+  if (!plate || !mechanic || !date) { showToast('Please fill all required fields.', 'error'); return; }
+
+  var svcRows = [], matRows = [];
+  document.querySelectorAll('#svcSvcRows .svc-row').forEach(function(row) {
+    var name = (row.querySelector('.svc-row-name') || {}).value || '';
+    if (!name) return;
+    svcRows.push({ name: name, qty: (row.querySelector('.svc-row-qty')||{}).value||'1', uom: (row.querySelector('.svc-row-uom')||{}).value||'', cost: (row.querySelector('.svc-row-cost')||{}).value||'0' });
+  });
+  document.querySelectorAll('#svcMatRows .svc-row').forEach(function(row) {
+    var name = (row.querySelector('.svc-row-name') || {}).value || '';
+    if (!name) return;
+    matRows.push({ name: name, qty: (row.querySelector('.svc-row-qty')||{}).value||'1', uom: (row.querySelector('.svc-row-uom')||{}).value||'', cost: (row.querySelector('.svc-row-cost')||{}).value||'0' });
+  });
+
+  var v = _svcVehicles.find(function(x){ return (x.plate || x.plateNumber) === plate; });
+  var total = svcCalcTotal();
+  var data = {
+    plate: plate,
+    desc: v ? (v.desc || v.assetDescription || '') : '',
+    mechanic: mechanic,
+    date: date,
+    cost: '₱' + total.toLocaleString('en-PH', {minimumFractionDigits:2}),
+    svcRows: svcRows,
+    matRows: matRows,
+  };
+
+  var db = firebase.firestore();
+  if (window._svcEditingId) {
+    db.collection('maintenance').doc(window._svcEditingId).update(data)
+      .then(function() { closeModal('svcAddModal'); showToast('Service updated successfully!', 'success'); })
+      .catch(function(err) { showToast('Update failed: ' + err.message, 'error'); });
+  } else {
+    data.status = 'Pending';
+    data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+    db.collection('maintenance').add(data)
+      .then(function() { closeModal('svcAddModal'); showToast('Service added successfully!', 'success'); })
+      .catch(function(err) { showToast('Save failed: ' + err.message, 'error'); });
+  }
+}
+</script>
 </html>

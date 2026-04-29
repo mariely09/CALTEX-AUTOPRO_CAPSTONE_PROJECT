@@ -84,7 +84,7 @@ class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
                 style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
-            icon: Icon(_searching ? Icons.close : Icons.search, color: Colors.white),
+            icon: Icon(_searching ? Icons.close : Icons.search_outlined, color: Colors.white),
             onPressed: () => setState(() {
               _searching = !_searching;
               if (!_searching) { _searchCtrl.clear(); _searchQuery = ''; }
@@ -494,7 +494,11 @@ class _AdminInventoryItemMasterState extends State<AdminInventoryItemMaster> {
                         }
                       },
                       style: ElevatedButton.styleFrom(backgroundColor: _red, foregroundColor: Colors.white),
-                      child: Text(isEdit ? '💾 Update' : '💾 Save'),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        const Icon(Icons.save_outlined, size: 16),
+                        const SizedBox(width: 6),
+                        Text(isEdit ? 'Update' : 'Save'),
+                      ]),
                     )),
                   ]),
                 ]),

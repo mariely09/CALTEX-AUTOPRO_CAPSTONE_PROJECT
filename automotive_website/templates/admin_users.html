@@ -6,6 +6,9 @@
     <title>User Management – AutoPro Admin</title>
     <link rel="stylesheet" href="../static/css/style.css">
     <link rel="stylesheet" href="../static/css/admin.css">
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
 </head>
 <body class="portal-body" data-page="users">
 
@@ -20,27 +23,41 @@
                 <div class="breadcrumb">Admin Portal</div>
                 <div class="admin-header-title">User Management</div>
             </div>
+            <div style="margin-left:auto;position:relative;display:flex;align-items:center;">
+                <svg style="position:absolute;left:0.65rem;pointer-events:none;color:#a0aec0;" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" class="search-bar" placeholder="Search users..." id="userSearch" style="width:220px;padding-left:2rem;" oninput="renderUsersList()">
+            </div>
         </div>
 
         <div class="admin-content">
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1.25rem;margin-bottom:2rem;">
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1.25rem;margin-bottom:2rem;">
                 <div class="stat-card">
-                    <div class="stat-icon blue">👥</div>
-                    <div class="stat-number" id="userStatTotal">0</div>
+                    <div class="stat-icon" style="background:rgba(59,130,246,0.10);color:#3b82f6;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    </div>
+                    <div class="stat-number" id="userStatTotal" style="color:#3b82f6;">0</div>
                     <div class="stat-label">Total Users</div>
-                    <div class="stat-change positive">All registered accounts</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-icon green">✅</div>
-                    <div class="stat-number" id="userStatActive">0</div>
-                    <div class="stat-label">Active Users</div>
-                    <div class="stat-change positive">Currently enabled</div>
+                    <div class="stat-icon red">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    </div>
+                    <div class="stat-number" id="userStatAdmin">0</div>
+                    <div class="stat-label">Admin</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-icon red">🚫</div>
-                    <div class="stat-number" id="userStatInactive">0</div>
-                    <div class="stat-label">Inactive Users</div>
-                    <div class="stat-change negative">Disabled accounts</div>
+                    <div class="stat-icon green">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    </div>
+                    <div class="stat-number" id="userStatCustomer">0</div>
+                    <div class="stat-label">Customer</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background:rgba(0,48,135,0.10);color:#003087;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    </div>
+                    <div class="stat-number" id="userStatStaff" style="color:#003087;">0</div>
+                    <div class="stat-label">Staff</div>
                 </div>
             </div>
 
@@ -53,6 +70,90 @@
         </div>
     </div>
     </div><!-- /.admin-dashboard-body -->
+</div>
+
+<!-- Floating Add Button -->
+<button onclick="openAddUserModal()" style="position:fixed;bottom:2rem;right:2rem;width:56px;height:56px;border-radius:50%;background:#E31E24;border:none;color:white;cursor:pointer;box-shadow:0 4px 16px rgba(227,30,36,0.4);display:flex;align-items:center;justify-content:center;z-index:9999;transition:transform 0.2s,box-shadow 0.2s;" onmouseover="this.style.transform='scale(1.1)';this.style.boxShadow='0 6px 24px rgba(227,30,36,0.5)'" onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 4px 16px rgba(227,30,36,0.4)'">
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+</button>
+
+<!-- View User Modal -->
+<div class="modal" id="viewUserModal">
+    <div class="modal-content" style="max-width:480px;padding:0;border-radius:20px;overflow:hidden;">
+        <div id="vuHeader" style="background:linear-gradient(135deg,#E31E24,#C41E3A);padding:1.25rem 1.5rem;display:flex;align-items:center;gap:0.85rem;">
+            <div style="background:rgba(255,255,255,0.2);width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <span id="vuAvatar" style="color:white;font-size:1.1rem;font-weight:800;"></span>
+            </div>
+            <div style="flex:1;">
+                <div id="vuName" style="color:white;font-size:1rem;font-weight:700;"></div>
+                <div id="vuUsername" style="color:rgba(255,255,255,0.75);font-size:0.78rem;margin-top:0.1rem;"></div>
+            </div>
+            <button onclick="closeModal('viewUserModal')" style="background:rgba(255,255,255,0.2);border:none;color:white;width:32px;height:32px;border-radius:50%;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;">&times;</button>
+        </div>
+        <div style="padding:1.25rem 1.5rem;background:#f8fafc;">
+            <div id="vuInfoGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;"></div>
+        </div>
+        <div style="padding:1rem 1.5rem;background:white;border-top:1px solid #e2e8f0;">
+            <button id="vuEditBtn" style="width:100%;padding:0.8rem;background:linear-gradient(135deg,#E31E24,#C41E3A);border:none;border-radius:10px;color:white;font-weight:700;cursor:pointer;font-size:0.95rem;display:flex;align-items:center;justify-content:center;gap:0.5rem;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                Edit
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit User Modal -->
+<div class="modal" id="addUserModal">
+    <div class="modal-content" style="max-width:480px;padding:0;border-radius:20px;overflow:hidden;">
+        <div style="background:linear-gradient(135deg,#E31E24,#C41E3A);padding:1.25rem 1.5rem;display:flex;align-items:center;gap:0.85rem;">
+            <div style="background:rgba(255,255,255,0.2);width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;">
+                <svg id="userModalIcon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </div>
+            <div style="flex:1;">
+                <div id="userModalTitle" style="color:white;font-size:1rem;font-weight:700;">Add User</div>
+            </div>
+            <button onclick="closeModal('addUserModal')" style="background:rgba(255,255,255,0.2);border:none;color:white;width:32px;height:32px;border-radius:50%;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;">&times;</button>
+        </div>
+        <form id="addUserForm" style="padding:1.25rem 1.5rem;background:#f8fafc;display:flex;flex-direction:column;gap:0.85rem;">
+            <div class="form-group" style="margin:0;">
+                <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Full Name *</label>
+                <input type="text" name="name" required style="margin-top:0.3rem;">
+            </div>
+            <div class="form-group" style="margin:0;">
+                <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Username *</label>
+                <input type="text" name="username" required style="margin-top:0.3rem;">
+            </div>
+            <div class="form-group" style="margin:0;">
+                <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Email *</label>
+                <input type="email" name="email" required style="margin-top:0.3rem;">
+            </div>
+            <div class="form-group" style="margin:0;">
+                <label style="font-size:0.78rem;font-weight:600;color:#4a5568;">Role *</label>
+                <select name="role" required style="margin-top:0.3rem;">
+                    <option value="admin">Admin</option>
+                    <option value="staff" selected>Staff</option>
+                    <option value="customer">Customer</option>
+                </select>
+            </div>
+            <div id="addUserEmailNote" style="display:none;background:#f0fff4;border:1px solid #9ae6b4;border-radius:10px;padding:0.75rem 1rem;font-size:0.82rem;color:#276749;display:none;align-items:center;gap:0.5rem;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                A temporary password will be auto-generated and sent to the user's email.
+            </div>
+            <div style="display:flex;gap:0.75rem;padding-top:0.5rem;">
+                <button type="button" class="btn-secondary" style="flex:1;" onclick="closeModal('addUserModal')">Cancel</button>
+                <button type="submit" id="userSubmitBtn" class="btn-primary" style="flex:1;display:flex;align-items:center;justify-content:center;gap:0.4rem;">
+                    <span id="userSubmitContent" style="display:flex;align-items:center;gap:0.4rem;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                        Save
+                    </span>
+                    <span id="userSubmitLoading" style="display:none;align-items:center;gap:0.5rem;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 0.8s linear infinite;"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                        Saving...
+                    </span>
+                </button>
+            </div>
+        </form>
+    </div>
 </div>
 
 <div id="toast"></div>
@@ -80,5 +181,185 @@
 <script src="../static/js/admin_functions.js"></script>
 <script src="../static/js/admin.js"></script>
 <script src="../static/js/admin_sidebar.js"></script>
+<script>
+var _editingUserId = null;
+
+function _generateTempPassword() {
+    var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    var base = '';
+    for (var i = 0; i < 8; i++) base += chars[Math.floor(Math.random() * chars.length)];
+    return base + '@1';
+}
+
+function _sendWelcomeEmail(toEmail, toName, tempPassword, role) {
+    return fetch('/api/send-welcome-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to_email: toEmail, to_name: toName, temp_password: tempPassword, role: role })
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+        console.log('Email result:', data);
+        return data.ok === true;
+    })
+    .catch(function(err){
+        console.error('Email send error:', err);
+        return false;
+    });
+}
+
+function openAddUserModal() {
+    _editingUserId = null;
+    document.getElementById('userModalTitle').textContent = 'Add User';
+    document.getElementById('userModalIcon').innerHTML = '<path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>';
+    document.getElementById('addUserForm').reset();
+    // Reset button to Save state
+    var c = document.getElementById('userSubmitContent');
+    if (c) c.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save';
+    // Show email note for add mode
+    var note = document.getElementById('addUserEmailNote');
+    if (note) note.style.display = 'flex';
+    document.getElementById('addUserModal').classList.add('active');
+}
+
+function viewUser(userId) {
+    var users = window.users || [];
+    var u = users.find(function(x){ return x.id === userId; });
+    if (!u) return;
+    var roleColors = { admin:'#E31E24', staff:'#003087', customer:'#38a169' };
+    var rc = roleColors[(u.role||'').toLowerCase()] || '#718096';
+    document.getElementById('vuAvatar').textContent = (u.name||'?').split(' ').map(function(n){ return n[0]; }).join('').toUpperCase().slice(0,2);
+    document.getElementById('vuName').textContent = u.name || '—';
+    document.getElementById('vuUsername').textContent = u.username || '—';
+    var roleLabel = (u.role||''); roleLabel = roleLabel.charAt(0).toUpperCase() + roleLabel.slice(1);
+    var statusLower = (u.status||'').toLowerCase();
+    var statusColor = statusLower === 'active' ? '#38a169' : '#718096';
+    var statusLabel = statusLower === 'active' ? 'Active' : 'Inactive';
+    document.getElementById('vuInfoGrid').innerHTML = [
+        ['Email', u.email||'—'],
+        ['Role', '<span style="background:'+rc+'20;color:'+rc+';padding:0.2rem 0.6rem;border-radius:20px;font-size:0.78rem;font-weight:700;">'+roleLabel+'</span>'],
+        ['Status', '<span style="background:'+statusColor+'20;color:'+statusColor+';padding:0.2rem 0.6rem;border-radius:20px;font-size:0.78rem;font-weight:700;">'+statusLabel+'</span>'],
+        ['Username', u.username||'—'],
+    ].map(function(item){
+        return '<div style="background:white;border-radius:10px;padding:0.85rem;border:1px solid #e2e8f0;">'
+            + '<div style="font-size:0.7rem;color:#718096;font-weight:700;text-transform:uppercase;margin-bottom:0.3rem;">'+item[0]+'</div>'
+            + '<div style="font-weight:600;color:#1a202c;font-size:0.85rem;">'+item[1]+'</div>'
+            + '</div>';
+    }).join('');
+    document.getElementById('vuEditBtn').onclick = function(){ closeModal('viewUserModal'); editUser(userId); };
+    document.getElementById('viewUserModal').classList.add('active');
+}
+
+function editUser(userId) {
+    var users = window.users || [];
+    var u = users.find(function(x){ return x.id === userId; });
+    if (!u) return;
+    _editingUserId = userId;
+    document.getElementById('userModalTitle').textContent = 'Edit User';
+    document.getElementById('userModalIcon').innerHTML = '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>';
+    var form = document.getElementById('addUserForm');
+    form.elements.name.value = u.name || '';
+    form.elements.username.value = u.username || '';
+    form.elements.email.value = u.email || '';
+    form.elements.role.value = (u.role||'staff').toLowerCase();
+    // Switch button to Update state
+    var c = document.getElementById('userSubmitContent');
+    if (c) c.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Update';
+    // Hide email note in edit mode
+    var note = document.getElementById('addUserEmailNote');
+    if (note) note.style.display = 'none';
+    document.getElementById('addUserModal').classList.add('active');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    var form = document.getElementById('addUserForm');
+    if (!form) return;
+
+    function setLoading(on) {
+        var btn     = document.getElementById('userSubmitBtn');
+        var content = document.getElementById('userSubmitContent');
+        var loading = document.getElementById('userSubmitLoading');
+        if (!btn) return;
+        btn.disabled = on;
+        content.style.display = on ? 'none' : 'flex';
+        loading.style.display  = on ? 'flex' : 'none';
+    }
+
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        var name     = form.elements.name.value.trim();
+        var username = form.elements.username.value.trim();
+        var email    = form.elements.email.value.trim();
+        var role     = form.elements.role.value;
+        if (!name || !username || !email) { showToast('Please fill all required fields.', 'error'); return; }
+
+        var isEdit = !!_editingUserId;
+        setLoading(true);
+
+        var db = firebase.firestore();
+        if (_editingUserId) {
+            // Edit — update fields, preserve existing status
+            db.collection('users').doc(_editingUserId).update({ name: name, username: username, email: email, role: role })
+                .then(function(){
+                    closeModal('addUserModal');
+                    showToast('User updated successfully!', 'success');
+                })
+                .catch(function(err){ showToast('Error: ' + err.message, 'error'); })
+                .finally(function(){ setLoading(false); });
+        } else {
+            // Add — auto-generate password, create via Firebase Auth REST, save to Firestore, send email
+            var tempPass = _generateTempPassword();
+            var apiKey = 'AIzaSyCaoJWbwJk0Xi694ARHpdHhiNjT0SpASRs';
+            fetch('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=' + apiKey, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: email, password: tempPass, returnSecureToken: false })
+            })
+            .then(function(r){ return r.json(); })
+            .then(function(data) {
+                if (data.error) {
+                    if (data.error.message === 'EMAIL_EXISTS') {
+                        return db.collection('users').where('email', '==', email).limit(1).get()
+                            .then(function(snap) {
+                                if (!snap.empty) {
+                                    throw new Error('A user with this email already exists in the system.');
+                                }
+                                return db.collection('users').add({
+                                    name: name, username: username, email: email,
+                                    role: role, status: 'active',
+                                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                                }).then(function(){ return null; });
+                            });
+                    }
+                    throw new Error(data.error.message);
+                }
+                var uid = data.localId;
+                return db.collection('users').doc(uid).set({
+                    name: name, username: username, email: email,
+                    role: role, status: 'active',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                }).then(function(){ return tempPass; });
+            })
+            .then(function(pass) {
+                if (pass === null) {
+                    closeModal('addUserModal');
+                    showToast('User record created. Note: Auth account already existed.', 'success');
+                    setLoading(false);
+                    return;
+                }
+                return _sendWelcomeEmail(email, name, pass, role)
+                    .then(function(sent) {
+                        closeModal('addUserModal');
+                        showToast('User added!' + (sent ? ' Credentials sent to ' + email + '.' : ' (Email not sent — check server.)'), 'success');
+                    });
+            })
+            .catch(function(err){
+                showToast('Error: ' + (err.message || 'Unknown error'), 'error');
+            })
+            .finally(function(){ setLoading(false); });
+        }
+    });
+});
+</script>
 </body>
 </html>

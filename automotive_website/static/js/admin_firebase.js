@@ -89,7 +89,9 @@
           type: v.type || 'truck',
           icon: (v.type || '').toLowerCase().includes('car') ? '🚗' : '🚛',
           owner: v.owner || v.ownerName || '',
-          odometer: v.odometer || v.odo || 0,
+          odometer: parseInt(String(v.odometer || v.odo || '0').replace(/[^0-9]/g, '')) || 0,
+          lastSvcOdo: v.lastSvcOdo || v.lastServiceOdometer || '',
+          svcFreq: v.svcFreq || v.serviceFrequency || '',
           status: _mapVehicleStatus(status),
           lastServiceDate: lastSvc,
           nextPMSDue: nextPMSDue,
@@ -98,6 +100,16 @@
       });
       if (typeof renderAssetsList === 'function') renderAssetsList();
       _updateOverviewStats();
+      // DSS-PMS readiness: vehicles loaded
+      window._dssVehiclesReady = true;
+      if (window._dssDataReady && typeof renderDSSPMS === 'function') {
+        const active = document.querySelector('.admin-section.active');
+        if (active && active.id === 'dss-pms') renderDSSPMS();
+      }
+      // Trigger initial DSS-PMS render if pending
+      if (!window._dssDataReady && window._dssPendingSection === 'dss-pms') {
+        if (typeof window._onDSSDataReady === 'function') window._onDSSDataReady();
+      }
     });
 
     // Maintenance / Services
@@ -170,6 +182,16 @@
       }
       _updateInventoryStats();
       _updateOverviewStats();
+      // DSS readiness: mark inventory loaded
+      window._dssInventoryReady = true;
+      if (window._dssInventoryReady && window._dssIssuancesReady) {
+        if (typeof window._onDSSDataReady === 'function') window._onDSSDataReady();
+        // On subsequent updates re-render DSS if it's the active page
+        if (window._dssDataReady && typeof renderDSS === 'function') {
+          const active = document.querySelector('.admin-section.active');
+          if (active && active.id === 'dss') renderDSS();
+        }
+      }
     });
 
     // Item Master
@@ -219,6 +241,16 @@
         if (!section || section.id === 'issuance') renderIssuancesList();
       }
       _updateIssuanceStats();
+      // DSS readiness: mark issuances loaded
+      window._dssIssuancesReady = true;
+      if (window._dssInventoryReady && window._dssIssuancesReady) {
+        if (typeof window._onDSSDataReady === 'function') window._onDSSDataReady();
+        // On subsequent updates re-render DSS if it's the active page
+        if (window._dssDataReady && typeof renderDSS === 'function') {
+          const active = document.querySelector('.admin-section.active');
+          if (active && active.id === 'dss') renderDSS();
+        }
+      }
     });
 
     // Transactions
@@ -264,10 +296,21 @@
       }
     });
 
-    // Notifications
-    db.collection('notifications').orderBy('createdAt', 'desc').limit(20).onSnapshot(snap => {
+    // Notifications — update badge from Firestore + re-render panel
+    db.collection('notifications').orderBy('createdAt', 'desc').limit(30).onSnapshot(snap => {
       window._fbNotifications = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
       if (typeof renderAdminNotifications === 'function') renderAdminNotifications();
+      // Update header badge from Firestore unread count
+      const uid = user.uid;
+      const unread = window._fbNotifications.filter(n => {
+        const readBy = n.readBy || {};
+        return readBy[uid] !== true;
+      }).length;
+      const badge = document.getElementById('adminHeaderNotifBadge');
+      if (badge) {
+        badge.textContent = unread > 9 ? '9+' : unread;
+        badge.style.display = unread > 0 ? 'flex' : 'none';
+      }
     });
 
   } // end _initFirestore

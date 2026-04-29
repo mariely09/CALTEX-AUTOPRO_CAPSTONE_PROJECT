@@ -54,6 +54,14 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       final role = doc.data()?['role'] as String? ?? '';
+      final status = ((doc.data()?['status'] as String?) ?? 'active').toLowerCase();
+
+      // Block inactive users
+      if (status == 'inactive') {
+        await FirebaseAuth.instance.signOut();
+        _showError('Your account has been deactivated. Please contact the administrator.');
+        return;
+      }
 
       if (!mounted) return;
       switch (role) {
@@ -108,10 +116,19 @@ class _LoginScreenState extends State<LoginScreen> {
           'email': cred.user!.email ?? '',
           'photoUrl': cred.user!.photoURL ?? '',
           'role': role,
+          'status': 'active',
           'createdAt': FieldValue.serverTimestamp(),
         });
       } else {
         role = doc.data()?['role'] as String? ?? '';
+        final status = ((doc.data()?['status'] as String?) ?? 'active').toLowerCase();
+
+        // Block inactive users
+        if (status == 'inactive') {
+          await FirebaseAuth.instance.signOut();
+          _showError('Your account has been deactivated. Please contact the administrator.');
+          return;
+        }
       }
 
       if (!mounted) return;

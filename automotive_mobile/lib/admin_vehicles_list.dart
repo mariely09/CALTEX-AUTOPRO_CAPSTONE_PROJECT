@@ -152,13 +152,13 @@ class _AdminVehiclesListState extends State<AdminVehiclesList> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
               child: Row(children: [
-                _statChip('Total', '${vehicles.length}', Colors.blue),
+                _statChip('Total', '${vehicles.length}', const Color(0xFF003087), Icons.directions_car_outlined),
                 const SizedBox(width: 8),
-                _statChip('Active', '$good', Colors.green),
+                _statChip('Active', '$good', Colors.green, Icons.check_circle_outline),
                 const SizedBox(width: 8),
-                _statChip('Maintenance', '$maint', Colors.orange),
+                _statChip('Maintenance', '$maint', Colors.orange, Icons.build_outlined),
                 const SizedBox(width: 8),
-                _statChip('Overdue', '$overdue', _red),
+                _statChip('Overdue', '$overdue', _red, Icons.warning_amber_outlined),
               ]),
             ),
             Expanded(
@@ -177,13 +177,19 @@ class _AdminVehiclesListState extends State<AdminVehiclesList> {
     );
   }
 
-  Widget _statChip(String label, String value, Color color) {
+  Widget _statChip(String label, String value, Color color, IconData icon) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)]),
         child: Column(children: [
+          Container(
+            width: 32, height: 32,
+            decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+            child: Icon(icon, color: color, size: 16),
+          ),
+          const SizedBox(height: 6),
           Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
           Text(label, style: const TextStyle(fontSize: 9, color: Color(0xFF718096))),
         ]),
@@ -233,6 +239,7 @@ class _AdminVehiclesListState extends State<AdminVehiclesList> {
   void _showVehicleDetails(Map<String, String> v) {
     showModalBottomSheet(
       context: context, isScrollControlled: true,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => DraggableScrollableSheet(
         expand: false, initialChildSize: 0.75, maxChildSize: 0.95,
@@ -332,6 +339,7 @@ class _AdminVehiclesListState extends State<AdminVehiclesList> {
 
     showModalBottomSheet(
       context: context, isScrollControlled: true,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (sheetCtx) => StatefulBuilder(
         builder: (sheetCtx, setModal) => AnimatedPadding(
@@ -480,7 +488,11 @@ class _AdminVehiclesListState extends State<AdminVehiclesList> {
                         }
                       },
                       style: ElevatedButton.styleFrom(backgroundColor: _red, foregroundColor: Colors.white),
-                      child: Text(isEdit ? '💾 Update' : '💾 Save'),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        const Icon(Icons.save_outlined, size: 16),
+                        const SizedBox(width: 6),
+                        Text(isEdit ? 'Update' : 'Save'),
+                      ]),
                     )),
                   ]),
                 ]),

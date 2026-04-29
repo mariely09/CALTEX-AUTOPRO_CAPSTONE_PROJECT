@@ -87,7 +87,7 @@ class _AdminInventoryStockState extends State<AdminInventoryStock> {
                 style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
-            icon: Icon(_searching ? Icons.close : Icons.search, color: Colors.white),
+            icon: Icon(_searching ? Icons.close : Icons.search_outlined, color: Colors.white),
             onPressed: () => setState(() {
               _searching = !_searching;
               if (!_searching) { _searchCtrl.clear(); _searchQuery = ''; }
@@ -671,7 +671,11 @@ class _AdminInventoryStockState extends State<AdminInventoryStock> {
                         }
                       },
                       style: ElevatedButton.styleFrom(backgroundColor: _red, foregroundColor: Colors.white),
-                      child: const Text('💾 Update'),
+                      child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(Icons.save_outlined, size: 16),
+                        SizedBox(width: 6),
+                        Text('Update'),
+                      ]),
                     )),
                   ]),
                 ]),
@@ -865,7 +869,11 @@ class _AdminInventoryStockState extends State<AdminInventoryStock> {
                                 }
                               },
                               style: ElevatedButton.styleFrom(backgroundColor: _red, foregroundColor: Colors.white),
-                              child: const Text('💾 Save'),
+                              child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                                Icon(Icons.save_outlined, size: 16),
+                                SizedBox(width: 6),
+                                Text('Save'),
+                              ]),
                             )),
                           ]),
                         ]);

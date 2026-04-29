@@ -171,7 +171,16 @@
       const data = doc.data();
       console.log('User data:', data);
       const role = data.role || '';
-      console.log('User role:', role);
+      const status = (data.status || 'active').toLowerCase();
+      console.log('User role:', role, '| status:', status);
+
+      // Block inactive users
+      if (status === 'inactive') {
+        await firebase.auth().signOut();
+        showToast('Your account has been deactivated. Please contact the administrator.');
+        setLoading(signinBtn, false, signinDefault);
+        return;
+      }
       
       // Store user in sessionStorage for dashboard auth guards
       const userData = {
@@ -235,10 +244,20 @@
           email: cred.user.email || '',
           photoUrl: cred.user.photoURL || '',
           role,
+          status: 'active',
           createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         });
       } else {
         role = doc.data().role || 'customer';
+        const status = (doc.data().status || 'active').toLowerCase();
+
+        // Block inactive users
+        if (status === 'inactive') {
+          await firebase.auth().signOut();
+          showToast('Your account has been deactivated. Please contact the administrator.');
+          setLoading(googleBtn, false, googleDefault);
+          return;
+        }
       }
       
       // Store user in sessionStorage for dashboard auth guards

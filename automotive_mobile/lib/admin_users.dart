@@ -7,9 +7,13 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:http/http.dart' as http;
 import 'firebase_options.dart';
 
-const _welcomeEmailjsServiceId  = 'service_i906b4o';
-const _welcomeEmailjsTemplateId = 'template_ovrow3w';
-const _welcomeEmailjsPublicKey  = 'DqRrjCkUnf9w2L_sv';
+// ── EmailJS config ────────────────────────────────────────────────────────
+// Same service as forgot_password.dart — no server needed, works on any network.
+const _ejsServiceId  = 'service_i906b4o';
+const _ejsPublicKey  = 'DqRrjCkUnf9w2L_sv';
+// Template for welcome / credentials email.
+// See setup instructions below in _sendWelcomeEmail.
+const _ejsWelcomeTemplateId = 'template_ovrow3w';
 
 class AdminUsers extends StatefulWidget {
   const AdminUsers({super.key});
@@ -52,6 +56,13 @@ class _AdminUsersState extends State<AdminUsers> {
     required String tempPassword,
     required String role,
   }) async {
+    // Uses EmailJS — no local server required, works on any network.
+    // Variable mapping matches the "Welcome" template in EmailJS dashboard:
+    //   To Email field:  {{email}}
+    //   Subject:         {{name}}
+    //   Body variables:  {{to_name}}, {{to_email}}, {{temp_password}}, {{role}}
+
+    final roleLabel = role[0].toUpperCase() + role.substring(1);
     try {
       final res = await http.post(
         Uri.parse('https://api.emailjs.com/api/v1.0/email/send'),
@@ -60,18 +71,21 @@ class _AdminUsersState extends State<AdminUsers> {
           'origin': 'https://dashboard.emailjs.com',
         },
         body: jsonEncode({
-          'service_id':  _welcomeEmailjsServiceId,
-          'template_id': _welcomeEmailjsTemplateId,
-          'user_id':     _welcomeEmailjsPublicKey,
+          'service_id':  _ejsServiceId,
+          'template_id': _ejsWelcomeTemplateId,
+          'user_id':     _ejsPublicKey,
           'template_params': {
-            'to_email':      toEmail,
-            'to_name':       toName,
-            'temp_password': tempPassword,
-            'role':          role,
+            'email':         toEmail,      // → To Email field: {{email}}
+            'name':          toName,       // → Subject: {{name}}
+            'to_name':       toName,       // → Body greeting: {{to_name}}
+            'to_email':      toEmail,      // → Credentials box: {{to_email}}
+            'temp_password': tempPassword, // → {{temp_password}}
+            'role':          roleLabel,    // → {{role}}
           },
         }),
       );
-      debugPrint('Welcome email ${res.statusCode}: ${res.body}');
+
+      debugPrint('EmailJS welcome ${res.statusCode}: ${res.body}');
       return res.statusCode == 200;
     } catch (e) {
       debugPrint('Welcome email error: $e');
@@ -149,12 +163,15 @@ class _AdminUsersState extends State<AdminUsers> {
           final total = users.length;
           final customers = users.where((u) => u['role'] == 'customer').length;
           final staff = users.where((u) => u['role'] == 'staff').length;
+          final admins = users.where((u) => u['role'] == 'admin').length;
 
           return Column(children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
               child: Row(children: [
                 _statChip('Total', '$total', Colors.blue),
+                const SizedBox(width: 8),
+                _statChip('Admin', '$admins', _red),
                 const SizedBox(width: 8),
                 _statChip('Customer', '$customers', Colors.green),
                 const SizedBox(width: 8),
@@ -178,12 +195,21 @@ class _AdminUsersState extends State<AdminUsers> {
   }
 
   Widget _statChip(String label, String value, Color color) {
+    final icon = label == 'Total'
+        ? Icons.people_outline
+        : Icons.person_outline;
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)]),
         child: Column(children: [
+          Container(
+            width: 32, height: 32,
+            decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+            child: Icon(icon, color: color, size: 16),
+          ),
+          const SizedBox(height: 6),
           Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: color)),
           Text(label, style: const TextStyle(fontSize: 9, color: Color(0xFF718096))),
         ]),
@@ -209,7 +235,7 @@ class _AdminUsersState extends State<AdminUsers> {
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(u['name']!, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-            Text('@${u['username']}', style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
+            Text('${u['username']}', style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
             Text(u['email']!, style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
           ])),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
@@ -228,11 +254,29 @@ class _AdminUsersState extends State<AdminUsers> {
             icon: const Icon(Icons.more_vert, size: 18, color: Color(0xFF718096)),
             onSelected: (val) {
               if (val == 'edit') _showAddUserModal(user: u);
-              if (val == 'delete') _confirmDelete(u);
+              if (val == 'toggle') _confirmDelete(u);
             },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_outlined, size: 16), SizedBox(width: 8), Text('Edit')])),
-              PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, size: 16, color: Colors.red), SizedBox(width: 8), Text('Delete', style: TextStyle(color: Colors.red))])),
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_outlined, size: 16), SizedBox(width: 8), Text('Edit')])),
+              PopupMenuItem(
+                value: 'toggle',
+                child: Row(children: [
+                  Icon(
+                    u['status']?.toLowerCase() == 'active'
+                        ? Icons.block_outlined
+                        : Icons.check_circle_outline,
+                    size: 16,
+                    color: u['status']?.toLowerCase() == 'active' ? Colors.orange : Colors.green,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    u['status']?.toLowerCase() == 'active' ? 'Deactivate' : 'Activate',
+                    style: TextStyle(
+                      color: u['status']?.toLowerCase() == 'active' ? Colors.orange : Colors.green,
+                    ),
+                  ),
+                ]),
+              ),
             ],
           ),
         ]),
@@ -244,6 +288,7 @@ class _AdminUsersState extends State<AdminUsers> {
     final rc = _roleColor(u['role']!);
     showModalBottomSheet(
       context: context, isScrollControlled: true,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => DraggableScrollableSheet(
         expand: false, initialChildSize: 0.55, maxChildSize: 0.8,
@@ -261,7 +306,7 @@ class _AdminUsersState extends State<AdminUsers> {
                 const SizedBox(width: 12),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(u['name']!, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                  Text('@${u['username']}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                  Text('${u['username']}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
                 ])),
                 GestureDetector(onTap: () => Navigator.pop(context),
                   child: const Icon(Icons.close, color: Colors.white)),
@@ -271,7 +316,7 @@ class _AdminUsersState extends State<AdminUsers> {
               padding: const EdgeInsets.all(20),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 _detailRow('Full Name', u['name']!),
-                _detailRow('Username', '@${u['username']}'),
+                _detailRow('Username', '${u['username']}'),
                 _detailRow('Email', u['email']!),
                 _detailRow('Role', _roleLabel(u['role']!)),
                 _detailRow('Status', u['status']!),
@@ -314,6 +359,7 @@ class _AdminUsersState extends State<AdminUsers> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => StatefulBuilder(
@@ -516,12 +562,19 @@ class _AdminUsersState extends State<AdminUsers> {
                             }
 
                             // 4. Send welcome email
-                            final sent = await _sendWelcomeEmail(
-                              toEmail:      emailCtrl.text.trim(),
-                              toName:       nameCtrl.text.trim(),
-                              tempPassword: tempPass,
-                              role:         selectedRole,
-                            );
+                            bool sent = false;
+                            String emailError = '';
+                            try {
+                              sent = await _sendWelcomeEmail(
+                                toEmail:      emailCtrl.text.trim(),
+                                toName:       nameCtrl.text.trim(),
+                                tempPassword: tempPass,
+                                role:         selectedRole,
+                              );
+                            } catch (e) {
+                              emailError = e.toString();
+                              debugPrint('Email send caught: $e');
+                            }
 
                             if (ctx.mounted) {
                               Navigator.pop(ctx);
@@ -532,8 +585,9 @@ class _AdminUsersState extends State<AdminUsers> {
                                       color: Colors.white, size: 18),
                                   const SizedBox(width: 8),
                                   Expanded(child: Text(
-                                      'User added successfully!'
-                                      '${sent ? ' Credentials sent to ${emailCtrl.text.trim()}.' : ' (Email not sent — check EmailJS setup.)'}')),
+                                      sent
+                                        ? 'User added! Credentials sent to ${emailCtrl.text.trim()}.'
+                                        : 'User added! Email failed: ${emailError.isNotEmpty ? emailError.substring(0, emailError.length.clamp(0, 120)) : "unknown error"}')),
                                 ]),
                                 backgroundColor: Colors.green,
                                 behavior: SnackBarBehavior.floating,
@@ -571,7 +625,11 @@ class _AdminUsersState extends State<AdminUsers> {
                               width: 18, height: 18,
                               child: CircularProgressIndicator(
                                   strokeWidth: 2, color: Colors.white))
-                          : Text(isEdit ? '💾 Update' : '📧 Add & Send'),
+                          : Row(mainAxisSize: MainAxisSize.min, children: [
+                              Icon(isEdit ? Icons.save_outlined : Icons.send_outlined, size: 16),
+                              const SizedBox(width: 6),
+                              Text(isEdit ? 'Update' : 'Add & Send'),
+                            ]),
                     )),
                   ]),
                 ]),
@@ -584,39 +642,61 @@ class _AdminUsersState extends State<AdminUsers> {
   }
 
   void _confirmDelete(Map<String, String> u) {
+    final isActive = (u['status'] ?? '').toLowerCase() == 'active';
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Delete User'),
-        content: Text('Delete "${u['name']}"? This will remove their account from the app.'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(children: [
+          Icon(isActive ? Icons.block_outlined : Icons.check_circle_outline,
+              color: isActive ? Colors.orange : Colors.green, size: 22),
+          const SizedBox(width: 8),
+          Text(isActive ? 'Deactivate User' : 'Activate User'),
+        ]),
+        content: Text(
+          isActive
+            ? 'Deactivate "${u['name']}"? They will no longer be able to log in.'
+            : 'Activate "${u['name']}"? They will be able to log in again.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isActive ? Colors.orange : Colors.green,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
             onPressed: () async {
               Navigator.pop(context);
               try {
-                // Delete from Firestore
+                final newStatus = isActive ? 'Inactive' : 'Active';
                 await FirebaseFirestore.instance
                     .collection('users')
                     .doc(u['uid'])
-                    .delete();
+                    .update({'status': newStatus});
 
                 if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: const Row(children: [
-                    Icon(Icons.check_circle_outline, color: Colors.white, size: 18),
-                    SizedBox(width: 8),
-                    Expanded(child: Text('User deleted. To fully remove from Firebase Auth, delete them in the Firebase Console → Authentication.')),
+                  content: Row(children: [
+                    Icon(
+                      isActive ? Icons.block_outlined : Icons.check_circle_outline,
+                      color: Colors.white, size: 18),
+                    const SizedBox(width: 8),
+                    Text('User ${isActive ? 'deactivated' : 'activated'} successfully.'),
                   ]),
-                  backgroundColor: Colors.green,
+                  backgroundColor: isActive ? Colors.orange : Colors.green,
                   behavior: SnackBarBehavior.floating,
-                  duration: const Duration(seconds: 6),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))));
+                  duration: const Duration(seconds: 3),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ));
               } catch (e) {
                 if (mounted) ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
               }
             },
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            child: Text(isActive ? 'Deactivate' : 'Activate'),
           ),
         ],
       ),

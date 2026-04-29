@@ -27,14 +27,24 @@ function navigateTo(section) {
         initSidebarActive();
         window.location.hash = targetHash;
         if (typeof switchDSSSection === 'function') switchDSSSection(section);
+        _closeSidebar();
     } else if (currentPage === targetFile && !targetHash) {
         document.body.setAttribute('data-page', section);
         initSidebarActive();
         history.pushState(null, '', window.location.pathname);
         if (typeof switchDSSSection === 'function') switchDSSSection(section);
+        _closeSidebar();
     } else {
         window.location.href = url;
     }
+}
+
+// Close sidebar + overlay after navigation (mobile)
+function _closeSidebar() {
+    const sidebar = document.getElementById('adminSidebar');
+    const overlay = document.getElementById('adminSidebarOverlay');
+    if (sidebar) sidebar.classList.remove('admin-sidebar-open');
+    if (overlay) overlay.classList.remove('active');
 }
 
 function toggleAdminSidebar() {
@@ -88,3 +98,48 @@ function bindHeaderControls() {
 
     Promise.all([headerPromise, sidebarPromise]).then(bindHeaderControls);
 })();
+
+
+// ── Avatar dropdown ─────────────────────────────────────────
+window.toggleAvatarMenu = function(id) {
+    const menu = document.getElementById(id);
+    if (!menu) return;
+    const isOpen = menu.style.display === 'block';
+    document.querySelectorAll('.avatar-menu').forEach(m => m.style.display = 'none');
+    document.querySelectorAll('.notif-panel').forEach(p => p.style.display = 'none');
+    if (!isOpen) {
+        menu.style.display = 'block';
+        // Populate name from session
+        const sess = JSON.parse(
+            sessionStorage.getItem('apUser') ||
+            sessionStorage.getItem('spUser') ||
+            sessionStorage.getItem('cpUser') || '{}'
+        );
+        const nameEl = menu.querySelector('.avatar-menu-name');
+        if (nameEl && sess.name) nameEl.textContent = sess.name;
+    }
+};
+
+window.adminAvatarLogout = function() {
+    if (!confirm('Are you sure you want to logout?')) return;
+    sessionStorage.removeItem('apUser');
+    sessionStorage.removeItem('spUser');
+    sessionStorage.removeItem('cpUser');
+    if (typeof firebase !== 'undefined' && firebase.auth) {
+        firebase.auth().signOut().finally(() => { window.location.href = 'login.html'; });
+    } else {
+        window.location.href = 'login.html';
+    }
+};
+
+window.cuAvatarLogout = window.adminAvatarLogout;
+
+// Close avatar menu on outside click
+document.addEventListener('click', function(e) {
+    const menus   = document.querySelectorAll('.avatar-menu');
+    const avatars = document.querySelectorAll('[onclick*="toggleAvatarMenu"]');
+    let inside = false;
+    menus.forEach(m   => { if (m.contains(e.target))   inside = true; });
+    avatars.forEach(a => { if (a.contains(e.target))   inside = true; });
+    if (!inside) menus.forEach(m => m.style.display = 'none');
+});

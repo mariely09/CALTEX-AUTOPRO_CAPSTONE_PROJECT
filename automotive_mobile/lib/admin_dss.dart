@@ -17,6 +17,9 @@ class _AdminDSSState extends State<AdminDSS> {
   static const _blue = Color(0xFF003087);
   int _tab = 0;
 
+  static List<Map<String, String>> _stockItemsCache = [];
+  static List<Map<String, String>> _pmsAssetsCache = [];
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -27,6 +30,19 @@ class _AdminDSSState extends State<AdminDSS> {
         iconTheme: const IconThemeData(color: Colors.white),
         title: const Text('Decision Support System',
           style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.print_outlined, color: Colors.white),
+            tooltip: 'Print Report',
+            onPressed: () {
+              if (_tab == 0) {
+                _printCriticalItems(_stockItemsCache);
+              } else {
+                _printPMSReport(_pmsAssetsCache);
+              }
+            },
+          ),
+        ],
       ),
       body: Column(children: [
         Container(
@@ -65,128 +81,382 @@ class _AdminDSSState extends State<AdminDSS> {
           return const Center(child: CircularProgressIndicator());
         }
         final docs = snapshot.data?.docs ?? [];
-        final items = docs.map((d) {
-          final data = d.data() as Map<String, dynamic>;
-          final stock = (data['stock'] as num?)?.toInt() ?? 0;
-          final min = (data['min'] as num?)?.toInt() ?? 0;
-          final reorder = (data['reorder'] as num?)?.toInt() ?? 0;
-          final uom = data['uom'] as String? ?? '';
-          final isCritical = stock <= min;
-          // Estimate days left: assume consumption = reorder/30 per day if reorder set, else 1/day
-          final dailyRate = reorder > 0 ? reorder / 30.0 : 1.0;
-          final daysLeft = dailyRate > 0 ? (stock / dailyRate).round() : 999;
-          final orderQty = reorder > 0 ? '$reorder $uom' : '—';
-          return {
-            'name': data['name'] as String? ?? '—',
-            'stock': '$stock $uom',
-            'days': daysLeft < 999 ? '$daysLeft days' : '—',
-            'order': orderQty,
-            'priority': isCritical ? 'Critical' : 'OK',
-            'group': data['group'] as String? ?? '—',
-            'consumptionRate': dailyRate > 0 ? '${dailyRate.toStringAsFixed(1)} $uom/day' : '—',
-          };
-        }).toList()
-          ..sort((a, b) {
-            if (a['priority'] == 'Critical' && b['priority'] != 'Critical') return -1;
-            if (a['priority'] != 'Critical' && b['priority'] == 'Critical') return 1;
-            return 0;
-          });
 
-        return _buildStockDSSContent(items);
+        return StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance.collection('issuances').snapshots(),
+          builder: (context, issSnap) {
+            // Build consumption map: itemNum -> list of {date, qty}
+            final consumptionMap = <String, List<Map<String, dynamic>>>{};
+            if (issSnap.hasData) {
+              for (final d in issSnap.data!.docs) {
+                final data = d.data() as Map<String, dynamic>;
+                final itemNum = data['itemNum'] as String? ?? '';
+                // qty stored as String or num
+                final rawQty = data['qty'] ?? data['quantity'];
+                final qty = rawQty is num
+                    ? rawQty.toDouble()
+                    : double.tryParse(rawQty?.toString() ?? '') ?? 0.0;
+                final dateStr = data['date'] as String? ?? '';
+                if (itemNum.isEmpty || qty <= 0) continue;
+                consumptionMap.putIfAbsent(itemNum, () => []);
+                consumptionMap[itemNum]!.add({'date': dateStr, 'qty': qty});
+              }
+            }
+
+            final today = DateTime.now();
+            // Keep todayMidnight only for PMS date comparisons elsewhere
+            final todayMidnight = DateTime(today.year, today.month, today.day);
+
+            final items = docs.map((d) {
+              final data = d.data() as Map<String, dynamic>;
+              final itemNum = (data['num'] as String?)
+                           ?? (data['itemNum'] as String?)
+                           ?? d.id;
+              final stock   = (data['stock']  as num?)?.toInt() ?? 0;
+              final min     = (data['min']    as num?)?.toInt() ?? 0;
+              final max     = (data['max']    as num?)?.toInt() ?? 0;
+              final reorder = (data['reorder'] as num?)?.toInt() ?? 0;
+              final uom     = data['uom'] as String? ?? '';
+
+              // ── Consumption rate — mirrors website dssAnalyze() ──
+              final records = consumptionMap[itemNum] ?? [];
+
+              // totalConsumed: sum all qty records
+              final double totalConsumed = records.fold(
+                0.0, (s, r) => s + (r['qty'] as num).toDouble());
+
+              // earliest date among all issuance records for this item
+              DateTime? earliest;
+              for (final r in records) {
+                final d2 = _parseIssuanceDate(r['date'] as String? ?? '');
+                if (d2 != null && (earliest == null || d2.isBefore(earliest!))) {
+                  earliest = d2;
+                }
+              }
+
+              // daySpan: Math.max(1, Math.ceil((today - earliest) / 86400000))
+              // Website uses full timestamp for today (new Date()), earliest is UTC midnight
+              // from ISO date string. We mirror this: today has time, earliest is midnight.
+              final int daySpan = earliest != null
+                  ? (today.difference(earliest!).inMilliseconds / 86400000)
+                        .ceil()
+                        .clamp(1, 999999)
+                  : 30;
+
+              // dailyRate: totalConsumed / daySpan  (0 if no data)
+              final double dailyRate =
+                  totalConsumed > 0 ? totalConsumed / daySpan : 0.0;
+
+              // daysLeft: Math.floor(stock / dailyRate)
+              final int daysLeft = dailyRate > 0
+                  ? (stock / dailyRate).floor()
+                  : (stock > 0 ? 999 : 0);
+
+              // ── Priority — 3-Tier Color-Coded System ──
+              // 0 = Out of Stock  🔴 Red    (stock = 0)
+              // 1 = Low Stock     🟡 Yellow (stock ≤ min qty)
+              // 2 = Adequate      🟢 Green  (stock > min qty)
+              final int priorityScore;
+              final String priorityLabel;
+              if (stock == 0) {
+                priorityScore = 0;
+                priorityLabel = 'Out of Stock';
+              } else if (stock <= min) {
+                priorityScore = 1;
+                priorityLabel = 'Low Stock';
+              } else {
+                priorityScore = 2;
+                priorityLabel = 'Adequate';
+              }
+
+              // Lead time demand (7-day buffer)
+              final int leadTimeDemand = dailyRate > 0 ? (dailyRate * 7).ceil() : 0;
+
+              // Recommended order qty — shown for Out of Stock and Low Stock only
+              final int deficit      = (max - stock).clamp(0, 999999);
+              final int recommendQty = priorityScore <= 1
+                  ? (deficit > reorder ? deficit : reorder)
+                  : 0;
+
+              return {
+                'name':            data['name'] as String? ?? '—',
+                'itemNum':         itemNum,
+                'uom':             uom,
+                'stock':           '$stock $uom',
+                'max':             '$max',
+                'min':             '$min',
+                'reorderQty':      '$reorder',
+                'days':            daysLeft < 999
+                    ? '$daysLeft days'
+                    : (stock > 0 ? '—' : '0 days'),
+                'order':           priorityScore <= 1 && recommendQty > 0
+                    ? '$recommendQty $uom'
+                    : '—',
+                'priority':        priorityLabel,
+                'priorityScore':   '$priorityScore',
+                'group':           data['group'] as String? ?? '—',
+                'consumptionRate': dailyRate > 0
+                    ? '${dailyRate.toStringAsFixed(2)} $uom/day'
+                    : '—',
+                'totalConsumed':   totalConsumed > 0
+                    ? '${totalConsumed % 1 == 0 ? totalConsumed.toInt() : totalConsumed.toStringAsFixed(1)} $uom'
+                    : '—',
+                'leadNeed':        leadTimeDemand > 0 ? '$leadTimeDemand $uom' : '—',
+              };
+            }).toList()
+              ..sort((a, b) {
+                // Sort: Out of Stock(0) > Critical(1) > Low Stock(2) > Adequate(3) > Overstock(4)
+                final aScore = int.tryParse(a['priorityScore'] ?? '3') ?? 3;
+                final bScore = int.tryParse(b['priorityScore'] ?? '3') ?? 3;
+                return aScore.compareTo(bScore);
+              });
+
+            _stockItemsCache = items;
+            return _buildStockDSSContent(items);
+          },
+        );
       },
     );
   }
 
   Widget _buildStockDSSContent(List<Map<String, String>> items) {
-
     return Column(children: [
+      // ── KPI chips ──
       Container(
         color: Colors.white,
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.center, children: [
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Stock Replenishment', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1a202c))),
-              Text('Inventory replenishment recommendations', style: TextStyle(fontSize: 12, color: Color(0xFF718096))),
-            ]),
-            IconButton(
-              onPressed: () => _printCriticalItems(items),
-              icon: const Icon(Icons.print_outlined, color: _red),
-              tooltip: 'Print Critical Items',
-            ),
-          ]),
-          const SizedBox(height: 12),
+        child: Column(children: [
           Row(children: [
-            _kpiChip('Total Items', '${items.length}', _blue),
+            _kpiChip('Out of Stock', '${items.where((i) => i['priority'] == 'Out of Stock').length}', const Color(0xFFe53e3e), Icons.warning_amber_rounded),
             const SizedBox(width: 8),
-            _kpiChip('Critical', '${items.where((i) => i['priority'] == 'Critical').length}', _red),
+            _kpiChip('Low Stock', '${items.where((i) => i['priority'] == 'Low Stock').length}', const Color(0xFFd69e2e), Icons.trending_down_outlined),
             const SizedBox(width: 8),
-            _kpiChip('Adequate', '${items.where((i) => i['priority'] == 'OK').length}', _blue),
+            _kpiChip('Adequate', '${items.where((i) => i['priority'] == 'Adequate').length}', const Color(0xFF38a169), Icons.check_circle_outline),
           ]),
         ]),
       ),
+      // ── Item list ──
       Expanded(
         child: ListView.separated(
           padding: const EdgeInsets.all(16),
           itemCount: items.length,
           separatorBuilder: (_, __) => const SizedBox(height: 10),
-          itemBuilder: (_, i) {
-            final item = items[i];
-            final isCritical = item['priority'] == 'Critical';
-            final color = isCritical ? _red : _blue;
-            return GestureDetector(
-              onTap: () => _showStockDetails(item),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: isCritical ? Border.all(color: _red.withOpacity(0.25)) : null,
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
-                ),
-                child: Column(children: [
-                  Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                        Row(children: [
-                          Container(
-                            width: 40, height: 40,
-                            decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-                            child: Icon(Icons.inventory_2_outlined, color: color, size: 20),
-                          ),
-                          const SizedBox(width: 10),
-                          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text(item['name']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                            Text(item['group']!, style: const TextStyle(fontSize: 11, color: Color(0xFF718096))),
-                          ]),
-                        ]),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-                          child: Text(item['priority']!, style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w700)),
-                        ),
-                      ]),
-                      const SizedBox(height: 14),
-                      const Divider(height: 1),
-                      const SizedBox(height: 12),
-                      Row(children: [
-                        _infoBox(Icons.inventory_outlined, 'Stock', item['stock']!, const Color(0xFF003087), const Color(0xFFebf8ff)),
-                        const SizedBox(width: 6),
-                        _infoBox(Icons.trending_down_outlined, 'Consumption', item['consumptionRate']!, const Color(0xFFE8001C), const Color(0xFFfff5f5)),
-                        const SizedBox(width: 6),
-                        _infoBox(Icons.schedule_outlined, 'Days Left', item['days']!, const Color(0xFFdd6b20), const Color(0xFFfffaf0)),
-                        const SizedBox(width: 6),
-                        _infoBox(Icons.shopping_cart_outlined, 'Order Qty', item['order']!, const Color(0xFF2c7a7b), const Color(0xFFe6fffa)),
-                      ]),
-                    ]),
-                  ),
-                ]),
-              ),
-            );
-          },
+          itemBuilder: (_, i) => _buildStockCard(items[i]),
         ),
       ),
     ]);
+  }
+
+  /// Card layout that mirrors the website table row:
+  /// Item name/num/group | Stock bar | Consumption | Days Left | Order | Priority | Decision
+  Widget _buildStockCard(Map<String, String> item) {
+    final priority = item['priority'] ?? 'Adequate';
+    final color = _priorityColor(priority);
+    final isCritical = priority == 'Out of Stock';
+    // Parse stock numbers for the progress bar
+    final stockRaw   = item['stock'] ?? '0';
+    final stockNum   = int.tryParse(stockRaw.split(' ').first) ?? 0;
+    final maxRaw     = item['max'] ?? '0';
+    final maxNum     = int.tryParse(maxRaw) ?? 0;
+    final minRaw     = item['min'] ?? '0';
+    final reorderRaw = item['reorderQty'] ?? '0';
+    final stockPct   = (maxNum > 0) ? (stockNum / maxNum).clamp(0.0, 1.0) : 0.0;
+
+    // Decision text — 3-tier system
+    final String decision;
+    final IconData decisionIcon;
+    switch (priority) {
+      case 'Out of Stock':
+        decision = 'URGENT: Emergency order';
+        decisionIcon = Icons.warning_rounded;
+        break;
+      case 'Low Stock':
+        decision = 'SOON: Plan to order';
+        decisionIcon = Icons.schedule_outlined;
+        break;
+      default:
+        decision = 'MONITOR: No action needed';
+        decisionIcon = Icons.check_circle_outline;
+    }
+
+    return GestureDetector(
+      onTap: () => _showStockDetails(item),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: isCritical ? Border.all(color: _red.withOpacity(0.25)) : null,
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+
+            // ── Row 1: Item name + priority badge ──
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              Row(children: [
+                Container(
+                  width: 38, height: 38,
+                  decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+                  child: Icon(Icons.inventory_2_outlined, color: color, size: 18),
+                ),
+                const SizedBox(width: 10),
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(item['name']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  Text(
+                    '${item['itemNum'] ?? ''}${item['itemNum'] != null && item['group'] != null ? '  ·  ' : ''}${item['group'] ?? ''}',
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF718096)),
+                  ),
+                ]),
+              ]),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: color.withOpacity(0.3)),
+                ),
+                child: Text(priority.toUpperCase(),
+                  style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w800, letterSpacing: 0.3)),
+              ),
+            ]),
+
+            const SizedBox(height: 12),
+            const Divider(height: 1, color: Color(0xFFe2e8f0)),
+            const SizedBox(height: 12),
+
+            // ── Row 2: Stock status ──
+            _sectionLabel('STOCK STATUS'),
+            const SizedBox(height: 6),
+            Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              Text(
+                stockRaw.split(' ').first,
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: color),
+              ),
+              const SizedBox(width: 4),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 3),
+                child: Text(
+                  '/ ${item['max'] ?? '—'} ${item['uom'] ?? ''}',
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF718096)),
+                ),
+              ),
+            ]),
+            const SizedBox(height: 6),
+            // Progress bar
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: stockPct,
+                minHeight: 6,
+                backgroundColor: const Color(0xFFe2e8f0),
+                valueColor: AlwaysStoppedAnimation<Color>(color),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Min: ${item['min'] ?? '—'}  ·  Reorder pt: ${item['reorderQty'] ?? '—'}',
+              style: const TextStyle(fontSize: 10, color: Color(0xFF718096)),
+            ),
+
+            const SizedBox(height: 12),
+            const Divider(height: 1, color: Color(0xFFe2e8f0)),
+            const SizedBox(height: 12),
+
+            // ── Row 3: Consumption | Days Left | Order ──
+            Row(children: [
+              // Consumption Rate
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                _sectionLabel('CONSUMPTION RATE'),
+                const SizedBox(height: 4),
+                RichText(text: TextSpan(
+                  children: [
+                    TextSpan(
+                      // consumptionRate is "0.25 L/day" — extract just the number
+                      text: (item['consumptionRate'] ?? '—') != '—'
+                          ? (item['consumptionRate']!.split(' ').first)
+                          : '—',
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF1a202c)),
+                    ),
+                    if ((item['consumptionRate'] ?? '—') != '—')
+                      const TextSpan(
+                        text: ' /day',
+                        style: TextStyle(fontSize: 11, color: Color(0xFF718096)),
+                      ),
+                  ],
+                )),
+                const SizedBox(height: 2),
+                Text(
+                  'Used: ${item['totalConsumed'] ?? '—'}',
+                  style: const TextStyle(fontSize: 10, color: Color(0xFF718096)),
+                ),
+              ])),
+
+              // Days Left
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                _sectionLabel('DAYS OF STOCK LEFT'),
+                const SizedBox(height: 4),
+                Text(
+                  item['days'] ?? '—',
+                  style: TextStyle(
+                    fontSize: 15, fontWeight: FontWeight.w800,
+                    color: (item['days'] ?? '—') == '—' ? const Color(0xFF718096) : color,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Lead need: ${item['leadNeed'] ?? '—'}',
+                  style: const TextStyle(fontSize: 10, color: Color(0xFF718096)),
+                ),
+              ])),
+
+              // Recommended Order
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                _sectionLabel('RECOMMENDED ORDER'),
+                const SizedBox(height: 4),
+                Text(
+                  item['order'] ?? '—',
+                  style: TextStyle(
+                    fontSize: 15, fontWeight: FontWeight.w800,
+                    color: (item['order'] ?? '—') == '—'
+                        ? const Color(0xFF718096)
+                        : color,
+                  ),
+                ),
+              ])),
+            ]),
+
+            const SizedBox(height: 12),
+            const Divider(height: 1, color: Color(0xFFe2e8f0)),
+            const SizedBox(height: 10),
+
+            // ── Row 4: Decision ──
+            Row(children: [
+              Icon(decisionIcon, size: 14, color: color),
+              const SizedBox(width: 6),
+              Text(decision, style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w600)),
+            ]),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  Color _priorityColor(String priority) {
+    switch (priority) {
+      case 'Out of Stock':
+        return const Color(0xFFe53e3e);   // 🔴 Red
+      case 'Low Stock':
+        return const Color(0xFFd69e2e);   // 🟡 Yellow
+      default:
+        return const Color(0xFF38a169);   // 🟢 Green (Adequate)
+    }
+  }
+
+  Widget _sectionLabel(String text) {
+    return Text(text,
+      style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700,
+        color: Color(0xFF718096), letterSpacing: 0.5));
   }
 
   Future<void> _printCriticalItems(List<Map<String, String>> items) async {
@@ -334,6 +604,128 @@ class _AdminDSSState extends State<AdminDSS> {
     await Printing.layoutPdf(onLayout: (_) async => pdf.save());
   }
 
+  Future<void> _printPMSReport(List<Map<String, String>> assets) async {
+    final pdf = pw.Document();
+    final now = DateTime.now();
+    final dateStr = '${now.day.toString().padLeft(2,'0')}/${now.month.toString().padLeft(2,'0')}/${now.year}';
+
+    final logoBytes = await rootBundle.load('assets/img/LOGO_CALTEX.png');
+    final logoImage = pw.MemoryImage(logoBytes.buffer.asUint8List());
+    final letterBytes = await rootBundle.load('assets/img/CALTEX_LETTER.png');
+    final letterImage = pw.MemoryImage(letterBytes.buffer.asUint8List());
+
+    pdf.addPage(pw.Page(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.symmetric(horizontal: 40, vertical: 36),
+      build: (pw.Context ctx) {
+        return pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              children: [
+                pw.Row(children: [
+                  pw.Image(logoImage, width: 44, height: 44),
+                  pw.SizedBox(width: 10),
+                  pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                    pw.Image(letterImage, height: 18),
+                    pw.SizedBox(height: 2),
+                    pw.Text('AutoPro Fleet Management',
+                      style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
+                  ]),
+                ]),
+                pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
+                  pw.Text('PMS Scheduling Report',
+                    style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold,
+                      color: const PdfColor.fromInt(0xFF1a202c))),
+                  pw.SizedBox(height: 2),
+                  pw.Text('Date Generated: $dateStr',
+                    style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
+                ]),
+              ],
+            ),
+            pw.SizedBox(height: 6),
+            pw.Divider(color: const PdfColor.fromInt(0xFFE8001C), thickness: 1.5),
+            pw.SizedBox(height: 16),
+            pw.Text('Preventive Maintenance Schedule',
+              style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold,
+                color: const PdfColor.fromInt(0xFF1a202c))),
+            pw.SizedBox(height: 4),
+            pw.Text('${assets.length} vehicle(s) listed below.',
+              style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
+            pw.SizedBox(height: 18),
+            pw.Table(
+              border: pw.TableBorder(
+                top: const pw.BorderSide(color: PdfColor.fromInt(0xFF003087), width: 1.5),
+                bottom: const pw.BorderSide(color: PdfColor.fromInt(0xFF003087), width: 1.5),
+                horizontalInside: const pw.BorderSide(color: PdfColors.grey300, width: 0.5),
+              ),
+              columnWidths: {
+                0: const pw.FlexColumnWidth(2),
+                1: const pw.FlexColumnWidth(3),
+                2: const pw.FlexColumnWidth(2),
+                3: const pw.FlexColumnWidth(2),
+                4: const pw.FlexColumnWidth(2),
+              },
+              children: [
+                pw.TableRow(
+                  decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFF003087)),
+                  children: ['Plate', 'Description', 'Last Service', 'Next PMS Due', 'Priority']
+                    .map((h) => pw.Padding(
+                      padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+                      child: pw.Text(h,
+                        style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 9)),
+                    )).toList(),
+                ),
+                ...assets.asMap().entries.map((e) {
+                  final a = e.value;
+                  final isEven = e.key % 2 == 0;
+                  final priorityColor = a['priority'] == 'Overdue'
+                    ? const PdfColor.fromInt(0xFFE8001C)
+                    : a['priority'] == 'Due Soon'
+                      ? const PdfColor.fromInt(0xFFdd6b20)
+                      : const PdfColor.fromInt(0xFF276749);
+                  return pw.TableRow(
+                    decoration: pw.BoxDecoration(
+                      color: isEven ? PdfColors.white : const PdfColor.fromInt(0xFFF7F8FA)),
+                    children: [
+                      pw.Padding(padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+                        child: pw.Text(a['plate']!, style: const pw.TextStyle(fontSize: 9))),
+                      pw.Padding(padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+                        child: pw.Text(a['desc']!, style: const pw.TextStyle(fontSize: 9))),
+                      pw.Padding(padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+                        child: pw.Text(a['lastService']!, style: const pw.TextStyle(fontSize: 9))),
+                      pw.Padding(padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+                        child: pw.Text(a['nextPMS']!, style: const pw.TextStyle(fontSize: 9))),
+                      pw.Padding(padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+                        child: pw.Text(a['priority']!,
+                          style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: priorityColor))),
+                    ],
+                  );
+                }),
+              ],
+            ),
+            pw.Spacer(),
+            pw.Divider(color: PdfColors.grey300),
+            pw.SizedBox(height: 4),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('Caltex AutoPro — Decision Support System',
+                  style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey500)),
+                pw.Text('Page 1 of 1  •  $dateStr',
+                  style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey500)),
+              ],
+            ),
+          ],
+        );
+      },
+    ));
+
+    await Printing.layoutPdf(onLayout: (_) async => pdf.save());
+  }
+
   pw.Widget _pdfChip(String label, String value, PdfColor color) {
     return pw.Container(
       padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -349,8 +741,8 @@ class _AdminDSSState extends State<AdminDSS> {
   }
 
   void _showStockDetails(Map<String, String> item) {
-    final isCritical = item['priority'] == 'Critical';
-    final color = isCritical ? _red : _blue;
+    final priority = item['priority'] ?? 'Adequate';
+    final color = _priorityColor(priority);
     showModalBottomSheet(
       context: context, isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
@@ -455,15 +847,24 @@ class _AdminDSSState extends State<AdminDSS> {
           if (lastDate != null && months != null) {
             final next = DateTime(lastDate.year, lastDate.month + months, lastDate.day);
             nextPMS = '${next.year}-${next.month.toString().padLeft(2,'0')}-${next.day.toString().padLeft(2,'0')}';
-            final daysUntil = next.difference(now).inDays;
+            // Strip time from both dates (midnight) to match website calculation
+            final today = DateTime(now.year, now.month, now.day);
+            final nextMidnight = DateTime(next.year, next.month, next.day);
+            final daysUntil = nextMidnight.difference(today).inDays;
             if (daysUntil < 0) {
-              due = 'Overdue ${(-daysUntil)} days';
+              due = 'Overdue ${(-daysUntil)} day(s)';
               priority = 'Overdue';
-            } else if (daysUntil <= 30) {
+            } else if (daysUntil <= 7) {
+              due = 'Due in $daysUntil day(s) (this week)';
+              priority = 'Due Soon';
+            } else if (daysUntil <= 14) {
               due = 'Due in $daysUntil days';
               priority = 'Due Soon';
+            } else if (daysUntil <= 30) {
+              due = 'Due in $daysUntil days';
+              priority = 'Scheduled';
             } else {
-              due = 'Due in ${(daysUntil / 30).round()} month(s)';
+              due = 'Due in $daysUntil days';
               priority = 'On Track';
             }
           }
@@ -478,30 +879,45 @@ class _AdminDSSState extends State<AdminDSS> {
           };
         }).toList()
           ..sort((a, b) {
-            const order = {'Overdue': 0, 'Due Soon': 1, 'On Track': 2};
-            return (order[a['priority']] ?? 3).compareTo(order[b['priority']] ?? 3);
+            const order = {'Overdue': 0, 'Due Soon': 1, 'Scheduled': 2, 'On Track': 3};
+            return (order[a['priority']] ?? 4).compareTo(order[b['priority']] ?? 4);
           });
 
+        _pmsAssetsCache = assets;
         return _buildPMSDSSContent(assets);
       },
     );
   }
 
   Widget _buildPMSDSSContent(List<Map<String, String>> assets) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final weekEnd = today.add(const Duration(days: 7));
+    final dueThisWeek = assets.where((a) {
+      if (a['nextPMS'] == '—') return false;
+      final d = DateTime.tryParse(a['nextPMS']!);
+      if (d == null) return false;
+      final dMidnight = DateTime(d.year, d.month, d.day);
+      return !dMidnight.isBefore(today) && !dMidnight.isAfter(weekEnd);
+    }).length;
+
     return Column(children: [
       Container(
         color: Colors.white,
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.center, children: [
-          const Text('PMS Scheduling', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1a202c))),
-          const Text('Preventive maintenance schedule recommendations', style: TextStyle(fontSize: 12, color: Color(0xFF718096))),
-          const SizedBox(height: 12),
+        child: Column(children: [
           Row(children: [
-            _kpiChip('Total', '${assets.length}', _blue),
+            _kpiChip('Due This Week', '$dueThisWeek', Colors.orange, Icons.calendar_today_outlined),
             const SizedBox(width: 8),
-            _kpiChip('Overdue', '${assets.where((a) => a['priority'] == 'Overdue').length}', _red),
+            _kpiChip('Overdue', '${assets.where((a) => a['priority'] == 'Overdue').length}', _red, Icons.error_outline),
+          ]),
+          const SizedBox(height: 8),
+          Row(children: [
+            _kpiChip('Due Soon', '${assets.where((a) => a['priority'] == 'Due Soon').length}', Colors.orange, Icons.schedule_outlined),
             const SizedBox(width: 8),
-            _kpiChip('On Track', '${assets.where((a) => a['priority'] == 'On Track').length}', _blue),
+            _kpiChip('Scheduled', '${assets.where((a) => a['priority'] == 'Scheduled').length}', _blue, Icons.event_outlined),
+            const SizedBox(width: 8),
+            _kpiChip('On Track', '${assets.where((a) => a['priority'] == 'On Track').length}', Colors.green, Icons.check_circle_outline),
           ]),
         ]),
       ),
@@ -514,7 +930,8 @@ class _AdminDSSState extends State<AdminDSS> {
             final a = assets[i];
             final color = a['priority'] == 'Overdue' ? _red
                 : a['priority'] == 'Due Soon' ? Colors.orange
-                : _blue;
+                : a['priority'] == 'Scheduled' ? _blue
+                : Colors.green;
             return GestureDetector(
               onTap: () => _showPMSDetails(a),
               child: Container(
@@ -562,7 +979,8 @@ class _AdminDSSState extends State<AdminDSS> {
   void _showPMSDetails(Map<String, String> a) {
     final color = a['priority'] == 'Overdue' ? _red
         : a['priority'] == 'Due Soon' ? Colors.orange
-        : _blue;
+        : a['priority'] == 'Scheduled' ? _blue
+        : Colors.green;
     showModalBottomSheet(
       context: context, isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
@@ -636,6 +1054,49 @@ class _AdminDSSState extends State<AdminDSS> {
     );
   }
 
+  /// Parses issuance date strings in multiple formats:
+  /// - "YYYY-MM-DD"  (website HTML date input, ISO — JS parses as UTC midnight)
+  /// - "M/D/YYYY"   (mobile app: '${now.month}/${now.day}/${now.year}')
+  /// - "Jan 1, 2025" (JS toLocaleDateString fallback)
+  ///
+  /// Returns UTC midnight to match JS `new Date("YYYY-MM-DD")` behaviour,
+  /// so that `today.difference(earliest)` mirrors `today - earliest` in JS.
+  static DateTime? _parseIssuanceDate(String s) {
+    if (s.isEmpty) return null;
+    // Try ISO first: "2025-04-29" → UTC midnight (matches JS new Date("2025-04-29"))
+    final iso = DateTime.tryParse(s);
+    if (iso != null) {
+      // DateTime.tryParse on "YYYY-MM-DD" returns local midnight in Dart.
+      // Convert to UTC midnight to match JS behaviour.
+      return DateTime.utc(iso.year, iso.month, iso.day);
+    }
+    // Try M/D/YYYY or MM/DD/YYYY: "4/29/2026", "04/29/2026"
+    final slashParts = s.split('/');
+    if (slashParts.length == 3) {
+      final m = int.tryParse(slashParts[0]);
+      final d = int.tryParse(slashParts[1]);
+      final y = int.tryParse(slashParts[2]);
+      if (m != null && d != null && y != null) {
+        return DateTime.utc(y, m, d);
+      }
+    }
+    // Try "Jan 1, 2025" (JS en-US locale format)
+    const months = {
+      'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
+      'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12,
+    };
+    final localeMatch = RegExp(r'^(\w+)\s+(\d+),\s+(\d{4})$').firstMatch(s.trim());
+    if (localeMatch != null) {
+      final mon = months[localeMatch.group(1)!.toLowerCase().substring(0, 3)];
+      final day = int.tryParse(localeMatch.group(2)!);
+      final yr  = int.tryParse(localeMatch.group(3)!);
+      if (mon != null && day != null && yr != null) {
+        return DateTime.utc(yr, mon, day);
+      }
+    }
+    return null;
+  }
+
   Widget _detailRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -675,15 +1136,24 @@ class _AdminDSSState extends State<AdminDSS> {
     );
   }
 
-  Widget _kpiChip(String label, String value, Color color) {
+  Widget _kpiChip(String label, String value, Color color, IconData icon) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(color: const Color(0xFFF7F8FA), borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withOpacity(0.2))),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF7F8FA),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withOpacity(0.2)),
+        ),
         child: Column(children: [
+          Container(
+            width: 28, height: 28,
+            decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(8)),
+            child: Icon(icon, color: color, size: 15),
+          ),
+          const SizedBox(height: 5),
           Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: color)),
-          Text(label, style: const TextStyle(fontSize: 9, color: Color(0xFF718096))),
+          Text(label, style: const TextStyle(fontSize: 9, color: Color(0xFF718096)), textAlign: TextAlign.center),
         ]),
       ),
     );

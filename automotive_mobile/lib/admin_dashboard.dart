@@ -216,6 +216,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
       builder: (_) => Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
@@ -693,13 +694,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
         final totalOut = txns.where((t) => t['type'] == 'OUT').length;
 
         return Column(children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Inventory Transactions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1a202c))),
-              Text('Track all stock in and out movements', style: TextStyle(fontSize: 12, color: Color(0xFF718096))),
-            ]),
-          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: Row(children: [
@@ -777,6 +771,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => DraggableScrollableSheet(
         expand: false, initialChildSize: 0.5, maxChildSize: 0.75,
@@ -1039,17 +1034,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
         return Column(children: [
           Container(
             color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
             child: Column(crossAxisAlignment: CrossAxisAlignment.center, children: [
-              const Text('Vehicle Issuances', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1a202c))),
-              const Text('Items issued per service transaction', style: TextStyle(fontSize: 12, color: Color(0xFF718096))),
-              const SizedBox(height: 12),
+              const SizedBox(height: 4),
               Row(children: [
                 _issStatChip('Total', '${issuances.length}', Colors.blue),
                 const SizedBox(width: 8),
                 _issStatChip('Services', '$totalServices', const Color(0xFF003087)),
                 const SizedBox(width: 8),
-                _issStatChip('Materials', '$totalMaterials', Colors.green),
+                _issStatChip('Materials', '$totalMaterials', _red),
               ]),
             ]),
           ),
@@ -1108,12 +1101,23 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Widget _issStatChip(String label, String value, Color color) {
+    final icon = label == 'Total'
+        ? Icons.receipt_long_outlined
+        : label == 'Services'
+            ? Icons.build_outlined
+            : Icons.inventory_2_outlined;
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(color: const Color(0xFFF7F8FA), borderRadius: BorderRadius.circular(10),
           border: Border.all(color: color.withOpacity(0.2))),
         child: Column(children: [
+          Container(
+            width: 30, height: 30,
+            decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+            child: Icon(icon, color: color, size: 15),
+          ),
+          const SizedBox(height: 5),
           Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: color)),
           Text(label, style: const TextStyle(fontSize: 9, color: Color(0xFF718096))),
         ]),
@@ -1129,6 +1133,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
     showModalBottomSheet(
       context: context, isScrollControlled: true,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => DraggableScrollableSheet(
         expand: false, initialChildSize: 0.75, maxChildSize: 0.92,
@@ -1267,7 +1272,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminSmartReports())),
       },
       {
-        'icon': Icons.domain_outlined,
+        'icon': Icons.apps_outlined,
         'label': 'Domain Management',
         'sub': 'Manage lookup values & categories',
         'color': Colors.indigo,
@@ -1371,6 +1376,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => DraggableScrollableSheet(
         expand: false, initialChildSize: 0.75, maxChildSize: 0.92,
@@ -1675,7 +1681,11 @@ class _ScanAddStockWidgetState extends State<_ScanAddStockWidget> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
             child: _loading
                 ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Text('💾 Save to Stock'),
+                : const Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.save_outlined, size: 16),
+                    SizedBox(width: 6),
+                    Text('Save to Stock'),
+                  ]),
           ),
         ),
       ]),

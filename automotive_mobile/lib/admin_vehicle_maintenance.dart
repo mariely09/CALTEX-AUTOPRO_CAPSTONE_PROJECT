@@ -164,13 +164,13 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
               child: Row(children: [
-                _statChip('Total', '$total', Colors.blue),
+                _statChip('Total', '$total', const Color(0xFF003087), Icons.build_circle_outlined),
                 const SizedBox(width: 8),
-                _statChip('Ongoing', '$ongoing', Colors.orange),
+                _statChip('Ongoing', '$ongoing', Colors.orange, Icons.autorenew_outlined),
                 const SizedBox(width: 8),
-                _statChip('Completed', '$completed', Colors.green),
+                _statChip('Completed', '$completed', Colors.green, Icons.check_circle_outline),
                 const SizedBox(width: 8),
-                _statChip('Pending', '$pending', const Color(0xFF718096)),
+                _statChip('Pending', '$pending', const Color(0xFF718096), Icons.pending_outlined),
               ]),
             ),
             Expanded(
@@ -189,13 +189,19 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
     );
   }
 
-  Widget _statChip(String label, String value, Color color) {
+  Widget _statChip(String label, String value, Color color, IconData icon) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)]),
         child: Column(children: [
+          Container(
+            width: 32, height: 32,
+            decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+            child: Icon(icon, color: color, size: 16),
+          ),
+          const SizedBox(height: 6),
           Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: color)),
           Text(label, style: const TextStyle(fontSize: 9, color: Color(0xFF718096))),
         ]),
@@ -252,6 +258,7 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
     final sc = _statusColor(s['status'] as String);
     showModalBottomSheet(
       context: context, isScrollControlled: true,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => DraggableScrollableSheet(
         expand: false, initialChildSize: 0.6, maxChildSize: 0.85,
@@ -567,6 +574,7 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
 
     showModalBottomSheet(
       context: context, isScrollControlled: true,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => StatefulBuilder(
         builder: (ctx, setModal) {
@@ -809,7 +817,11 @@ class _AdminVehicleMaintenanceState extends State<AdminVehicleMaintenance> {
                           }
                         },
                         style: ElevatedButton.styleFrom(backgroundColor: _red, foregroundColor: Colors.white),
-                        child: Text(isEdit ? '💾 Update' : '💾 Save'),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          const Icon(Icons.save_outlined, size: 16),
+                          const SizedBox(width: 6),
+                          Text(isEdit ? 'Update' : 'Save'),
+                        ]),
                       )),
                     ]),
                   ]),

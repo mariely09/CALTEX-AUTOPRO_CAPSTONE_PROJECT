@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // Close panel when clicking outside
     document.addEventListener('click', function (e) {
         const panel = document.getElementById('adminNotifPanel');
-        const btn   = document.getElementById('adminNotifBtn');
+        const btn   = document.getElementById('adminHeaderNotifBtn');
         if (panel && btn && !panel.contains(e.target) && !btn.contains(e.target)) {
             panel.style.display = 'none';
         }
@@ -170,16 +170,110 @@ window.toggleAdminNotifPanel = function () {
     if (!panel) return;
     const isOpen = panel.style.display === 'block';
     panel.style.display = isOpen ? 'none' : 'block';
-    if (!isOpen) renderAdminNotifications();
+    if (!isOpen) {
+        // Merge Firestore notifications with local-data alerts
+        _renderAdminNotifPanel();
+    }
+};
+
+function _renderAdminNotifPanel() {
+    const listEl  = document.getElementById('adminNotifList');
+    const countEl = document.getElementById('adminNotifPanelCount');
+    if (!listEl) return;
+
+    // Local-data alerts (PMS, stock, services)
+    const localNotifs = buildAdminNotifications();
+
+    // Firestore notifications
+    const uid = (firebase.auth().currentUser || {}).uid;
+    const fbNotifs = (window._fbNotifications || []).map(n => ({
+        icon: n.type === 'warning' ? '⚠️' : n.type === 'success' ? '✅' : n.type === 'danger' ? '🚨' : '🔔',
+        type: n.type || 'info',
+        unread: uid ? (n.readBy || {})[uid] !== true : false,
+        title: n.title || '',
+        msg: n.message || '',
+        time: _fbTimeAgo(n.createdAt),
+        action: null,
+        _docId: n._id,
+    }));
+
+    const all = [...fbNotifs, ...localNotifs];
+    const unread = all.filter(n => n.unread).length;
+
+    const badge = document.getElementById('adminHeaderNotifBadge');
+    if (badge) {
+        badge.textContent = unread > 9 ? '9+' : unread;
+        badge.style.display = unread > 0 ? 'flex' : 'none';
+    }
+    if (countEl) countEl.textContent = all.length + ' notification' + (all.length !== 1 ? 's' : '');
+
+    if (all.length === 0) {
+        listEl.innerHTML = '<div class="admin-notif-empty"><div class="admin-notif-empty-icon">🔔</div><div class="admin-notif-empty-text">No notifications</div></div>';
+        return;
+    }
+
+    listEl.innerHTML = all.map((n, i) => `
+        <div class="admin-notif-item${n.unread ? ' unread' : ''}" onclick="_adminNotifClick(${i})">
+            <div class="admin-notif-icon">${n.icon}</div>
+            <div>
+                <div class="admin-notif-title">${n.title}</div>
+                <div class="admin-notif-msg">${n.msg}</div>
+                <div class="admin-notif-time">${n.time}</div>
+            </div>
+            ${n.unread ? '<div style="width:8px;height:8px;border-radius:50%;background:#E8001C;flex-shrink:0;margin-top:4px;"></div>' : ''}
+        </div>`).join('');
+
+    window._adminNotifAll = all;
+}
+
+function _fbTimeAgo(ts) {
+    if (!ts || !ts.toMillis) return '';
+    const diff = Date.now() - ts.toMillis();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1)  return 'Just now';
+    if (mins < 60) return mins + ' min ago';
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24)  return hrs + ' hr ago';
+    const days = Math.floor(hrs / 24);
+    return days === 1 ? 'Yesterday' : days + ' days ago';
+}
+
+window._adminNotifClick = function(i) {
+    const all = window._adminNotifAll || [];
+    const n = all[i];
+    if (!n) return;
+    // Mark Firestore notification as read
+    if (n._docId) {
+        const uid = (firebase.auth().currentUser || {}).uid;
+        if (uid) {
+            firebase.firestore().collection('notifications').doc(n._docId)
+                .update({ [`readBy.${uid}`]: true }).catch(() => {});
+        }
+    }
+    // Run local action
+    if (n.action) n.action();
+    document.getElementById('adminNotifPanel').style.display = 'none';
 };
 
 window.clearAdminNotifications = function () {
-    const listEl = document.getElementById('adminNotifList');
-    if (listEl) listEl.innerHTML = '<div class="admin-notif-empty"><div class="admin-notif-empty-icon">🔔</div><div class="admin-notif-empty-text">No notifications</div></div>';
-    const badge   = document.getElementById('adminNotifBadge');
+    const uid = (firebase.auth().currentUser || {}).uid;
+    // Mark all Firestore notifications as read
+    if (uid && window._fbNotifications) {
+        const batch = firebase.firestore().batch();
+        window._fbNotifications.forEach(n => {
+            if ((n.readBy || {})[uid] !== true) {
+                batch.update(firebase.firestore().collection('notifications').doc(n._id),
+                    { [`readBy.${uid}`]: true });
+            }
+        });
+        batch.commit().catch(() => {});
+    }
+    const listEl  = document.getElementById('adminNotifList');
     const countEl = document.getElementById('adminNotifPanelCount');
+    const badge   = document.getElementById('adminHeaderNotifBadge');
+    if (listEl)  listEl.innerHTML = '<div class="admin-notif-empty"><div class="admin-notif-empty-icon">🔔</div><div class="admin-notif-empty-text">No notifications</div></div>';
     if (badge)   badge.style.display = 'none';
-    if (countEl) countEl.textContent = '0 alerts';
+    if (countEl) countEl.textContent = '0 notifications';
 };
 
 // ── DSS — Stock Replenishment Decision Support System ───────
@@ -233,30 +327,27 @@ function dssAnalyze() {
         // Lead time buffer (assume 7 days lead time)
         const leadTimeDemand = Math.ceil(dailyRate * 7);
 
-        // Priority scoring
+        // Priority scoring — 3-Tier Color-Coded System
+        // 0 = Out of Stock  🔴 Red    (stock = 0)
+        // 1 = Low Stock     🟡 Yellow (stock ≤ min qty)
+        // 2 = Adequate      🟢 Green  (stock > min qty)
         let priority, priorityLabel, priorityColor;
         if (item.stock === 0) {
             priority = 0; priorityLabel = 'OUT OF STOCK'; priorityColor = '#e53e3e';
-        } else if (item.stock < item.minLevel) {
-            priority = 1; priorityLabel = 'CRITICAL';     priorityColor = '#e53e3e';
-        } else if (item.stock <= item.minLevel * 1.5 || daysLeft <= 14) {
-            priority = 2; priorityLabel = 'WARNING';      priorityColor = '#d69e2e';
-        } else if (item.stock <= item.reorderLevel) {
-            priority = 3; priorityLabel = 'REORDER';      priorityColor = '#3182ce';
+        } else if (item.stock <= item.minLevel) {
+            priority = 1; priorityLabel = 'LOW STOCK';    priorityColor = '#d69e2e';
         } else {
-            priority = 4; priorityLabel = 'ADEQUATE';     priorityColor = '#38a169';
+            priority = 2; priorityLabel = 'ADEQUATE';     priorityColor = '#38a169';
         }
 
-        // Decision text
+        // Decision text — 3-tier
         let decision;
-        if (priority <= 1) {
-            decision = 'Order immediately — stock critically low';
-        } else if (priority === 2) {
-            decision = 'Place order within 3 days';
-        } else if (priority === 3) {
-            decision = 'Schedule reorder this week';
+        if (priority === 0) {
+            decision = 'URGENT: Emergency order';
+        } else if (priority === 1) {
+            decision = 'SOON: Plan to order';
         } else {
-            decision = 'No action needed';
+            decision = 'MONITOR: No action needed';
         }
 
         // Stock bar pct
@@ -290,25 +381,24 @@ function renderDSSKpis() {
     const el = document.getElementById('dssKpiGrid');
     if (!el) return;
     const d = _dssData;
-    const outOfStock = d.filter(function (x) { return x.item.stock === 0; }).length;
-    const critical   = d.filter(function (x) { return x.priority === 1; }).length;
-    const warning    = d.filter(function (x) { return x.priority === 2; }).length;
-    const adequate   = d.filter(function (x) { return x.priority >= 4; }).length;
-    const totalOrderValue = d
-        .filter(function (x) { return x.priority <= 3; })
-        .reduce(function (s, x) { return s + (x.recommendQty * (x.item.price || 0)); }, 0);
+    const outOfStock = d.filter(function (x) { return x.priority === 0; }).length;
+    const lowStock   = d.filter(function (x) { return x.priority === 1; }).length;
+    const adequate   = d.filter(function (x) { return x.priority === 2; }).length;
 
     el.innerHTML = [
-        { icon: '🚨', label: 'Out of Stock',      val: outOfStock, color: '#e53e3e', bg: '#fff5f5', border: '#fed7d7' },
-        { icon: '⚠️', label: 'Critical / Low',    val: critical,   color: '#c05621', bg: '#fffbeb', border: '#fbd38d' },
-        { icon: '🔵', label: 'Warning Level',      val: warning,    color: '#2b6cb0', bg: '#ebf8ff', border: '#bee3f8' },
-        { icon: '✅', label: 'Adequate Stock',     val: adequate,   color: '#276749', bg: '#f0fff4', border: '#9ae6b4' },
-        { icon: '💰', label: 'Est. Order Value',   val: '₱' + totalOrderValue.toLocaleString('en-PH', { minimumFractionDigits: 2 }), color: '#553c9a', bg: '#faf5ff', border: '#d6bcfa', wide: true }
+        { svg: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+          label: 'Out of Stock', val: outOfStock, color: '#e53e3e', bg: 'rgba(229,62,62,0.10)' },
+        { svg: '<polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/>',
+          label: 'Low Stock', val: lowStock, color: '#d69e2e', bg: 'rgba(214,158,46,0.10)' },
+        { svg: '<polyline points="20 6 9 17 4 12"/>',
+          label: 'Adequate', val: adequate, color: '#38a169', bg: 'rgba(56,161,105,0.10)' },
     ].map(function (k) {
-        return '<div class="dss-kpi-card' + (k.wide ? ' wide' : '') + '" style="border-color:' + k.border + ';background:' + k.bg + ';">'
-            + '<div class="dss-kpi-icon">' + k.icon + '</div>'
-            + '<div class="dss-kpi-val" style="color:' + k.color + ';">' + k.val + '</div>'
-            + '<div class="dss-kpi-label">' + k.label + '</div>'
+        return '<div class="stat-card">'
+            + '<div class="stat-icon" style="background:' + k.bg + ';color:' + k.color + ';">'
+            +   '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + k.svg + '</svg>'
+            + '</div>'
+            + '<div class="stat-number" style="color:' + k.color + ';">' + k.val + '</div>'
+            + '<div class="stat-label">' + k.label + '</div>'
             + '</div>';
     }).join('');
 }
@@ -322,9 +412,9 @@ function renderDSSTable() {
 
     if (_dssFilter !== 'all') {
         rows = rows.filter(function (x) {
-            if (_dssFilter === 'critical') return x.priority <= 1;
-            if (_dssFilter === 'warning')  return x.priority === 2 || x.priority === 3;
-            if (_dssFilter === 'ok')       return x.priority >= 4;
+            if (_dssFilter === 'critical')  return x.priority <= 1;
+            if (_dssFilter === 'low-stock') return x.priority === 1;
+            if (_dssFilter === 'ok')        return x.priority === 2;
             return true;
         });
     }
@@ -343,14 +433,16 @@ function renderDSSTable() {
 
     body.innerHTML = rows.map(function (x) {
         const i = x.item;
-        const barColor = x.priority <= 1 ? '#e53e3e' : x.priority === 2 ? '#d69e2e' : x.priority === 3 ? '#3182ce' : '#38a169';
+        const barColor = x.priority === 0 ? '#e53e3e'
+            : x.priority === 1 ? '#d69e2e'
+            : '#38a169';
         const daysText = x.daysLeft >= 999 ? '<span style="color:#a0aec0;">∞ no usage</span>' : '<span style="color:' + barColor + ';font-weight:800;">' + x.daysLeft + ' days</span>';
         const rateText = x.dailyRate > 0 ? x.dailyRate.toFixed(2) + '<span style="color:#a0aec0;font-size:0.72rem;"> / day</span>' : '<span style="color:#a0aec0;">No data</span>';
 
         const priorityBadge = '<span class="dss-priority-badge" style="background:' + x.priorityColor + '18;color:' + x.priorityColor + ';border:1.5px solid ' + x.priorityColor + '40;">'
             + x.priorityLabel + '</span>';
 
-        const decisionIcon = x.priority <= 1 ? '🚨' : x.priority === 2 ? '⚠️' : x.priority === 3 ? '🔵' : '✅';
+        const decisionIcon = x.priority === 0 ? '🚨' : x.priority === 1 ? '⚠️' : '✅';
 
         return '<tr class="dss-tr">'
             // Item
@@ -376,10 +468,10 @@ function renderDSSTable() {
             + '</td>'
             // Recommended order
             + '<td class="dss-td">'
-            + (x.priority <= 3
+            + (x.priority <= 1
                 ? '<div class="dss-order-qty" style="color:' + barColor + ';">' + x.recommendQty + ' <span style="font-size:0.78rem;font-weight:600;color:#718096;">' + i.unit + '</span></div>'
                 + '<div class="dss-item-sub">≈ ₱' + (x.recommendQty * (i.price || 0)).toLocaleString('en-PH', { minimumFractionDigits: 2 }) + '</div>'
-                : '<div style="color:#38a169;font-weight:700;font-size:0.85rem;">—</div>')
+                : '<div style="color:#a0aec0;font-weight:700;font-size:0.85rem;">—</div>')
             + '</td>'
             // Priority
             + '<td class="dss-td">' + priorityBadge + '</td>'
@@ -396,7 +488,7 @@ function renderDSSInsights() {
     const d = _dssData;
     const topConsumed = d.slice().sort(function (a, b) { return b.totalConsumed - a.totalConsumed; }).slice(0, 5);
     const fastMoving  = d.filter(function (x) { return x.dailyRate > 0; }).sort(function (a, b) { return b.dailyRate - a.dailyRate; }).slice(0, 5);
-    const needOrder   = d.filter(function (x) { return x.priority <= 3; });
+    const needOrder   = d.filter(function (x) { return x.priority <= 1; });
 
     el.innerHTML = '<div class="dss-insight-card">'
         + '<div class="dss-insight-title">📦 Top Consumed Items</div>'
@@ -717,21 +809,27 @@ function renderDSSPMSKpis() {
     var overdue   = d.filter(function (x) { return x.statusKey === 'overdue'; }).length;
     var thisWeek  = d.filter(function (x) { return x.statusKey === 'this-week'; }).length;
     var dueSoon   = d.filter(function (x) { return x.statusKey === 'due-soon'; }).length;
-    var onTrack   = d.filter(function (x) { return x.statusKey === 'on-track' || x.statusKey === 'scheduled'; }).length;
-    var estCost   = d.filter(function (x) { return x.urgency <= 3; })
-                     .reduce(function (s, x) { return s + x.avgCost; }, 0);
+    var scheduled = d.filter(function (x) { return x.statusKey === 'scheduled'; }).length;
+    var onTrack   = d.filter(function (x) { return x.statusKey === 'on-track'; }).length;
 
     el.innerHTML = [
-        { icon: '🔴', label: 'Overdue PMS',      val: overdue,  color: '#e53e3e', bg: '#fff5f5', border: '#fed7d7' },
-        { icon: '🟠', label: 'Due This Week',     val: thisWeek, color: '#dd6b20', bg: '#fff8f0', border: '#fbd38d' },
-        { icon: '🟡', label: 'Due Soon (≤14d)',   val: dueSoon,  color: '#b7791f', bg: '#fffff0', border: '#faf089' },
-        { icon: '✅', label: 'On Track',          val: onTrack,  color: '#276749', bg: '#f0fff4', border: '#9ae6b4' },
-        { icon: '💰', label: 'Est. Urgent Cost',  val: '₱' + estCost.toLocaleString('en-PH', { minimumFractionDigits: 2 }), color: '#553c9a', bg: '#faf5ff', border: '#d6bcfa', wide: true }
+        { svg: '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+          label: 'Due This Week', val: thisWeek, color: '#dd6b20', bg: 'rgba(221,107,32,0.10)' },
+        { svg: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>',
+          label: 'Overdue PMS', val: overdue, color: '#e53e3e', bg: 'rgba(229,62,62,0.10)' },
+        { svg: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+          label: 'Due Soon', val: dueSoon, color: '#b7791f', bg: 'rgba(183,121,31,0.10)' },
+        { svg: '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 14 11 16 15 12"/>',
+          label: 'Scheduled', val: scheduled, color: '#003087', bg: 'rgba(0,48,135,0.10)' },
+        { svg: '<polyline points="20 6 9 17 4 12"/>',
+          label: 'On Track', val: onTrack, color: '#276749', bg: 'rgba(39,103,73,0.10)' },
     ].map(function (k) {
-        return '<div class="dss-kpi-card' + (k.wide ? ' wide' : '') + '" style="border-color:' + k.border + ';background:' + k.bg + ';">'
-            + '<div class="dss-kpi-icon">' + k.icon + '</div>'
-            + '<div class="dss-kpi-val" style="color:' + k.color + ';">' + k.val + '</div>'
-            + '<div class="dss-kpi-label">' + k.label + '</div>'
+        return '<div class="stat-card">'
+            + '<div class="stat-icon" style="background:' + k.bg + ';color:' + k.color + ';">'
+            +   '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + k.svg + '</svg>'
+            + '</div>'
+            + '<div class="stat-number" style="color:' + k.color + ';">' + k.val + '</div>'
+            + '<div class="stat-label">' + k.label + '</div>'
             + '</div>';
     }).join('');
 }
@@ -790,14 +888,12 @@ function renderDSSPMSTable() {
 
         return '<tr class="dss-tr">'
             + '<td class="dss-td">'
-            +   '<div class="dss-item-name">' + a.assetDescription + '</div>'
-            +   '<div class="dss-item-sub">' + a.assetNum + ' &nbsp;·&nbsp; ' + a.plateNumber + '</div>'
+            +   '<div class="dss-item-name">' + a.plateNumber + '</div>'
+            +   '<div class="dss-item-sub">' + a.assetDescription + '</div>'
             + '</td>'
             + '<td class="dss-td"><div style="font-weight:600;">' + lastSvc + '</div></td>'
             + '<td class="dss-td"><div style="font-weight:600;color:' + c + ';">' + nextPMS + '</div></td>'
             + '<td class="dss-td">' + daysCell + '</td>'
-            + '<td class="dss-td"><div style="font-weight:600;">' + odo + '</div></td>'
-            + '<td class="dss-td"><div style="font-weight:700;color:#2d3748;">' + costCell + '</div></td>'
             + '<td class="dss-td">' + badge + '</td>'
             + '<td class="dss-td"><div class="dss-decision">' + x.recommendation + '</div></td>'
             + '</tr>';
